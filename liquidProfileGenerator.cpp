@@ -3,6 +3,9 @@
 #include <stdexcept>
 #include <set>
 #include <sstream>
+#include <numeric>
+
+constexpr size_t NOT_DEFINED = -1;
 
 class CondesedGraph {
 public:
@@ -13,8 +16,8 @@ public:
         std::vector<size_t> condensedNodes;
         bool closed = false;
         bool cycle = false;
-        size_t distanceToCycle = -1;
-        size_t finalDelegation = -1;
+        size_t distanceToCycle = NOT_DEFINED;
+        size_t finalDelegation = NOT_DEFINED;
     };
     std::vector<Node> nodes;
 
@@ -32,93 +35,55 @@ public:
         return true;
     }
 
-    std::set<size_t> findSinks(size_t idx, std::vector<Node> & nodes) {
-        if (!nodes[idx].sinks.empty()) {
-            return nodes[idx].sinks;
+    size_t maxDistanceToCycle(size_t idx) {
+        if (nodes[idx].distanceToCycle != NOT_DEFINED) {
+            return nodes[idx].distanceToCycle;
         }
-
-        if (nodes[idx].cycle) {
-            return nodes[idx].sinks = {idx};
-        }
-
-        for (auto &i : nodes[idx].outEdges) {
-            auto otherSinks = findSinks(i, nodes);
-            nodes[idx].sinks.insert(otherSinks.begin(), otherSinks.end());
-        }
-
-        return nodes[idx].sinks;
-    }
-
-    bool checkEveryoneHasExactlyOneSink() {
-
-        for(const auto & n:nodes) {
-            if (n.sinks.size() != 1) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    size_t maxDistanceToCycle(size_t idx, std::vector<Node> & nodes) {
         if(nodes[idx].cycle) {
             return 0;
         }
 
         size_t acc = 0;
         for(auto & i:nodes[idx].outEdges){
-            acc = std::max(acc,maxDistanceToCycle(i, nodes));
+            acc = std::max(acc,maxDistanceToCycle(i));
         }
-
         return nodes[idx].distanceToCycle = acc+1;
     }
 
     bool reconstructDelegations() {
-        std::queue <size_t> q;
+        std::queue<size_t> q;
         for(size_t i = 0; i < nodes.size(); i++){
-            if (nodes[i].distanceToCycle == 0){
+            if(nodes[i].cycle) {
                 q.push(i);
-                nodes[i].closed = true;
             }
         }
-
-        while(!q.empty()){
-            size_t idx = q.front();
+        while(!q.empty()) {
+            size_t curr = q.front();
             q.pop();
 
-            for (auto & n:nodes[idx].reverseEdges) {
-                if ((nodes[n].distanceToCycle > nodes[idx].distanceToCycle) && nodes[n].closed){
-                    return false;
-                }
-                if (nodes[n].distanceToCycle == nodes[idx].distanceToCycle + 1){
-                    nodes[n].closed = true;
-                    nodes[n].finalDelegation = idx;
-                    q.push(n);
+            nodes[curr].outEdges.insert(curr);
+
+            for(auto & i:nodes[curr].reverseEdges){
+                if(nodes[i].distanceToCycle == nodes[curr].distanceToCycle + 1) {
+                    if (nodes[i].outEdges == nodes[curr].outEdges) {
+                        q.push(i);
+                    }
+                    else {
+                        return false;
+                    }
                 }
             }
         }
-        
-        bool res = true;
-        for (const auto & n:nodes){
-            res = res && n.closed;
-        }
-        return res;
+        return true;
     }
 
     bool hasSingleDelegations() {
         if (!identifySinks()) {
             return false;
         }
-        
-        for(size_t i = 0; i < nodes.size(); i++){
-            findSinks(i, nodes);
-        }
-
-        if (!checkEveryoneHasExactlyOneSink()) {
-            return false;
-        }
 
         for(size_t i = 0; i < nodes.size(); i++){
-            maxDistanceToCycle(i, nodes);
+            maxDistanceToCycle(i);
         }
         return reconstructDelegations();
     }
@@ -604,11 +569,17 @@ void checkWitnessingGraphMethod3(size_t k){
         mSet.insert(BitMatrix(edges).transitiveClosure());
     }
 
-    for (uint64_t mask = 0; mask < (1ULL << (k * k)); ++mask) {
+    uint64_t max = (1ULL << (k * k));
+
+    for (uint64_t mask = 0; mask < max; ++mask) {
+
+        if (mask%10000000 == 0) {
+            std::cout << 100.0*mask/max << "percent done\n";
+        }
 
         BitMatrix m(mask, k);
 
-        if (m.isTransitive()) {
+        if (m.isTransitive() && m.everyoneVoted()) {
             auto cg = m.buildCondesedGraph();
 
             if (cg.hasSingleDelegations() != (mSet.count(m) == 1)) {
