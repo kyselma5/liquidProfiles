@@ -7,16 +7,14 @@
 
 constexpr size_t NOT_DEFINED = -1;
 
-class CondesedGraph {
+class CondensedGraph {
 public:
     struct Node {
         std::set<size_t> outEdges;
         std::set<size_t> reverseEdges;
-        std::set<size_t> sinks;
         std::vector<size_t> condensedNodes;
-        bool closed = false;
-        bool cycle = false;
-        size_t distanceToCycle = NOT_DEFINED;
+        bool sink = false;
+        size_t maxDistanceToSink = NOT_DEFINED;
         size_t finalDelegation = NOT_DEFINED;
     };
     std::vector<Node> nodes;
@@ -24,8 +22,8 @@ public:
     bool identifySinks() {
         for (size_t i = 0; i < nodes.size(); i++) {
             if (nodes[i].outEdges.count(i) == 1){
-                nodes[i].cycle = true;
-                nodes[i].distanceToCycle = 0;
+                nodes[i].sink = true;
+                nodes[i].maxDistanceToSink = 0;
                 nodes[i].finalDelegation = i;
                 if (nodes[i].outEdges.size() != 1){
                     return false;
@@ -36,10 +34,10 @@ public:
     }
 
     size_t maxDistanceToCycle(size_t idx) {
-        if (nodes[idx].distanceToCycle != NOT_DEFINED) {
-            return nodes[idx].distanceToCycle;
+        if (nodes[idx].maxDistanceToSink != NOT_DEFINED) {
+            return nodes[idx].maxDistanceToSink;
         }
-        if(nodes[idx].cycle) {
+        if(nodes[idx].sink) {
             return 0;
         }
 
@@ -47,13 +45,13 @@ public:
         for(auto & i:nodes[idx].outEdges){
             acc = std::max(acc,maxDistanceToCycle(i));
         }
-        return nodes[idx].distanceToCycle = acc+1;
+        return nodes[idx].maxDistanceToSink = acc+1;
     }
 
     bool reconstructDelegations() {
         std::queue<size_t> q;
         for(size_t i = 0; i < nodes.size(); i++){
-            if(nodes[i].cycle) {
+            if(nodes[i].sink) {
                 q.push(i);
             }
         }
@@ -64,8 +62,9 @@ public:
             nodes[curr].outEdges.insert(curr);
 
             for(auto & i:nodes[curr].reverseEdges){
-                if(nodes[i].distanceToCycle == nodes[curr].distanceToCycle + 1) {
+                if(nodes[i].maxDistanceToSink == nodes[curr].maxDistanceToSink + 1) {
                     if (nodes[i].outEdges == nodes[curr].outEdges) {
+                        nodes[i].finalDelegation = curr;
                         q.push(i);
                     }
                     else {
@@ -88,34 +87,34 @@ public:
         return reconstructDelegations();
     }
 
-    std::vector<std::vector<bool>> reconstructDelegationMartix(){
+    std::vector<size_t> reconstructDelegationEdges(){
         size_t count = 0;
         for (const auto & n:nodes) {
             count += n.condensedNodes.size();
         }
-        std::vector<std::vector<bool>> bits;
-        bits.assign(count, std::vector<bool>(count, false));
+
+        std::vector<size_t> edges(count, NOT_DEFINED);
 
         for (const auto & n:nodes) {
-            if(n.cycle) {
+            if(n.sink) {
                 if (n.condensedNodes.size() == 1) {
-                    // cycle with one node meaning one self delegating voter
-                    bits[n.condensedNodes[0]][n.condensedNodes[0]] = true;
+                    // sink with one node meaning one self delegating voter
+                    edges[n.condensedNodes[0]] = n.condensedNodes[0];
                 }
                 else {
                     // more then one voter in this component -> we need to make cycle using those voter delegations
                     for(size_t i = 0; i < n.condensedNodes.size() - 1; i++) {
-                        bits[n.condensedNodes[i]][n.condensedNodes[i+1]] = true;
+                        edges[n.condensedNodes[i]] = n.condensedNodes[i+1];
                     }
-                    bits[n.condensedNodes[n.condensedNodes.size() - 1]][ n.condensedNodes[0]] = true;
+                    edges[n.condensedNodes[n.condensedNodes.size() - 1]] = n.condensedNodes[0];
                 }
             }
             else {
                 // node is not self delegating cycle, meaning it delegates to some other component -> we delegate the vote to some voter in that component
-                bits[n.condensedNodes[0]][nodes[n.finalDelegation].condensedNodes[0]] = true;
+                edges[n.condensedNodes[0]] = nodes[n.finalDelegation].condensedNodes[0];
             }
         }
-        return bits;
+        return edges;
     }
 
     void print(std::ostream &os = std::cout) const {
@@ -146,19 +145,18 @@ public:
             os << "\n";
 
             // flags
-            os << "  closed: " << (n.closed ? "true" : "false") << "\n";
-            os << "  cycle: " << (n.cycle ? "true" : "false") << "\n";
+            os << "  cycle: " << (n.sink ? "true" : "false") << "\n";
 
             // distances
             os << "  distanceToCycle: ";
-            if (n.distanceToCycle == (size_t)-1)
+            if (n.maxDistanceToSink == NOT_DEFINED)
                 os << "undefined";
             else
-                os << n.distanceToCycle;
+                os << n.maxDistanceToSink;
             os << "\n";
 
             os << "  finalDelegation: ";
-            if (n.finalDelegation == (size_t)-1)
+            if (n.finalDelegation == NOT_DEFINED)
                 os << "undefined";
             else
                 os << n.finalDelegation;
@@ -191,7 +189,7 @@ public:
             for (char c : line) {
                 if (c == '0') row.push_back(false);
                 else if (c == '1') row.push_back(true);
-                else if (isspace(c)) continue; // ignoruj mezery
+                else if (isspace(c)) continue;
                 else throw std::invalid_argument("Invalid character in input");
             }
 
@@ -254,7 +252,7 @@ public:
     }
 
     bool operator<(const BitMatrix &other) const {
-        if (k != other.k) return k < other.k; // nejdřív porovnáme velikost
+        if (k != other.k) return k < other.k;
 
         for (size_t i = 0; i < k; ++i) {
             if (bits[i] < other.bits[i]) return true;
@@ -276,6 +274,8 @@ public:
             std::cout << "\n";
         }
     }
+
+    size_t size() {return k;}
 
     bool isTransitive() const {
         return transitiveClosure() == *this;
@@ -360,45 +360,11 @@ public:
         return component;
     }
 
-    std::vector<std::set<size_t>> buildComponentGraph() const {
-
+    CondensedGraph buildCondensedGraph () const {
         std::vector<size_t> component = findSCCs();
 
         size_t componentcount = 1 + *std::max_element(component.begin(), component.end());
-        std::vector<std::set<size_t>> compAdj(componentcount);
-
-        for (size_t i = 0; i < component.size(); i++){
-            for (size_t j = 0; j < component.size(); j++){
-                if (component[i] != component[j] && at(i,j)) {
-                    compAdj[component[i]].insert(component[j]);
-                }
-            }
-        }
-        return compAdj;
-    }
-
-    BitMatrix buildComponentCondensationMartix() const {
-
-        std::vector<size_t> component = findSCCs();
-
-        size_t componentcount = 1 + *std::max_element(component.begin(), component.end());
-        BitMatrix matrix = BitMatrix(componentcount);
-
-        for (size_t i = 0; i < component.size(); i++){
-            for (size_t j = 0; j < component.size(); j++){
-                if (component[i] != component[j] && at(i,j)) {
-                    matrix.set(component[i], component[j], true);
-                }
-            }
-        }
-        return matrix;
-    }
-
-    CondesedGraph buildCondesedGraph () const {
-        std::vector<size_t> component = findSCCs();
-
-        size_t componentcount = 1 + *std::max_element(component.begin(), component.end());
-        CondesedGraph cg;
+        CondensedGraph cg;
 
         cg.nodes.resize(componentcount);
         
@@ -406,12 +372,12 @@ public:
             cg.nodes[component[i]].condensedNodes.push_back(i);
             for (size_t j = 0; j < component.size(); j++){
 
+                // we also want to add self delegation edges within the same component
                 if (at(i,j)) {
                     cg.nodes[component[i]].outEdges.insert(component[j]);
                     cg.nodes[component[j]].reverseEdges.insert(component[i]);
                 }
             }
-            cg.nodes[component[i]].closed = false;
         }
         return cg;
     }
@@ -429,7 +395,20 @@ public:
         return true;
     }
 
-    bool hasWitnessingGraphOld() const {
+    // checks is this matrix can represent LP is it does, returns true and in out parameter is one of the possible delegation matrixes.
+    bool isLiquidProfileFast(BitMatrix & out) const {
+        if (isTransitive() && everyoneVoted()) {
+            auto cg = buildCondensedGraph();
+
+            if (cg.hasSingleDelegations()) {
+                out = BitMatrix(cg.reconstructDelegationEdges());
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool isLiquidProfileSlow() const {
         if (k == 0) return true;
 
         std::vector<size_t> edges(k);
@@ -460,93 +439,20 @@ public:
 
 void printDelegationAndApprovalMatrix(size_t k, const std::vector<size_t> & edges) {
 
-    BitMatrix matrix = BitMatrix(edges);
+    BitMatrix matrix = BitMatrix(k);
 
-    //std::cout << "----- Delegation matrix -----\n";
-    //matrix.print();
-    //std::cout << "-----  Approval matrix  -----\n";
-    auto transitiveClosure = matrix.transitiveClosure();
-    std::cout << "martix - \n";
+    for(size_t i = 0; i < k; i++){
+        matrix.set(i, edges[i], true);
+    }
+    std::cout << "----- Delegation matrix -----\n";
     matrix.print();
-    std::cout << "closure - \n";
-    transitiveClosure.print();
-    //std::cout << "\n";
-    auto ssc = transitiveClosure.findSCCs();
-    std::cout << "scc - \n";
-    for(const auto & i :ssc){
-        std::cout << i << " ";
-    }
-    std::cout << std::endl;
-
-    auto cg = transitiveClosure.buildComponentGraph();
-    std::cout << "cg - \n";
-    for(size_t i = 0; i < cg.size(); i++){
-        std::cout << i << " - ";
-        for(const auto & e:cg[i]){
-            std::cout << e << " ";
-        }
-        std::cout << std::endl;
-    }
-
-    std::cout << std::endl;
-
-    auto condensedGraph = transitiveClosure.buildCondesedGraph();
-    condensedGraph.print();
-
-
-    std::cout << "hasWitnessingGraph " << condensedGraph.hasSingleDelegations() << std::endl;
-
-    std::cout << std::endl;
-    std::cout << std::endl;
+    std::cout << "-----  Approval matrix  -----\n";
+    (matrix.transitiveClosure()).print();
+    std::cout << "\n";
 }
 
-void checkWitnessingGraphMethod(size_t k){
-
-    for (uint64_t mask = 0; mask < (1ULL << (k * k)); ++mask) {
-
-        BitMatrix m(mask, k);
-
-        if (!m.isTransitive()) {
-            continue;
-        }
-
-        auto cg = m.buildCondesedGraph();
-
-        bool newmethod = cg.hasSingleDelegations();
-        bool oldmethod = m.hasWitnessingGraphOld();
-        if ( newmethod != oldmethod){
-            m.print();
-            std::cout << "old - " << newmethod << std::endl;
-            std::cout << "new - " << oldmethod << std::endl;
-            std::cout << std::endl;
-        }
-    }
-}
-
-void checkWitnessingGraphMethod2(size_t k){
-
-    for (uint64_t mask = 0; mask < (1ULL << (k * k)); ++mask) {
-
-        BitMatrix m(mask, k);
-
-        if (m.isTransitive()) {
-            auto cg = m.buildCondesedGraph();
-
-            bool newmethod = cg.hasSingleDelegations();
-            if (newmethod) {
-                m.print();
-                std::cout << "--------------\n";
-                auto bits = cg.reconstructDelegationMartix();
-                BitMatrix(bits.size(), bits).transitiveClosure().print();
-                std::cout << "--------------\n";
-                BitMatrix(bits.size(), bits).print();
-                std::cout << "\n\n";
-            }
-        }
-    }
-}
-
-void checkWitnessingGraphMethod3(size_t k){
+// test for isLiquidProfile method. Works by generating all liquid profiles of given size. Then generates all possible matrixes of given size and prints all graphs that are LP but weren't recognized or vise versa.
+void checkIsLiquidProfileMethod(size_t k){
 
     std::set<BitMatrix> mSet;
 
@@ -573,25 +479,22 @@ void checkWitnessingGraphMethod3(size_t k){
 
     for (uint64_t mask = 0; mask < max; ++mask) {
 
-        if (mask%10000000 == 0) {
+        if (mask%1000000 == 0) {
             std::cout << 100.0*mask/max << "percent done\n";
         }
 
         BitMatrix m(mask, k);
+        BitMatrix out(k);
 
-        if (m.isTransitive() && m.everyoneVoted()) {
-            auto cg = m.buildCondesedGraph();
-
-            if (cg.hasSingleDelegations() != (mSet.count(m) == 1)) {
-                m.print();
-                std::cout << "\n";
-            }
+        if (m.isLiquidProfileFast(out) != (mSet.count(m) == 1)) {
+            m.print();
+            std::cout << "\n";
         }
     }
 }
 
-
-void printAllMatrixiesOfgivenSize(size_t k) {
+// simple generator 
+void printAllMatrixesOfGivenSize(size_t k) {
 
     uint64_t kk = 1; //number of possible delegations
     for(size_t i = 0; i < k; i++) {
@@ -616,30 +519,40 @@ void printAllMatrixiesOfgivenSize(size_t k) {
 int main(int argc, char* argv[]) {
 
     if (argc != 2) {
-        std::cerr << "Usage: " << argv[0] << " <k>\n";
+        std::cerr << "Usage: " << argv[0] << " <k> (size of matrixes to be generated/tested)\n";
         return 1;
     }
 
     size_t k = std::stoi(argv[1]);
 
-    //printAllMatrixiesOfgivenSize(k);
-    checkWitnessingGraphMethod3(k);
+    // generating 
+    printAllMatrixesOfGivenSize(k);
 
-    /*
-    std::cout << "----------------------\n";
-    auto m = BitMatrix( "1 0 0 0\n"
-                        "1 0 1 1\n"
-                        "1 0 0 0\n"
-                        "0 0 0 1");
+    // testing of IsLiquidProfile Method (for development and debug)
+    // checkIsLiquidProfileMethod(k);
 
-    auto cg = m.buildCondesedGraph();
-    cg.print();
-    std::cout << "\n\nhas single delegations? " << cg.hasSingleDelegations() << "\n\n";
-    cg.print();
-    auto bits = cg.reconstructDelegationMartix();
-    BitMatrix(bits.size(), bits).print();
-    BitMatrix(bits.size(), bits).transitiveClosure().print();
-    */
+    // here you can write your own matrix to check if it is LP and deconstruct possible delegations. 
+    auto m = BitMatrix( "0 0 0 1 0 0 0 0 0\n"
+                        "0 0 0 1 0 0 0 0 0\n"
+                        "0 1 0 1 0 0 0 0 0\n"
+                        "0 0 0 1 0 0 0 0 0\n"
+                        "0 0 0 0 0 0 0 1 1\n"
+                        "0 0 0 0 0 0 0 1 1\n"
+                        "0 0 0 0 0 0 0 1 1\n"
+                        "0 0 0 0 0 0 0 1 1\n"
+                        "0 0 0 0 0 0 0 1 1");
 
+    BitMatrix out(m.size());
+
+    if (m.isLiquidProfileFast(out)) {
+        std::cout << "----approval profile----\n";
+        m.print();
+        std::cout << "--possible delegations--\n";
+        out.print();
+        std::cout << "\n";
+    }
+    else {
+        std::cout << "Matrix is not a Liquid Profile\n";
+    }
     return 0;
 }
