@@ -27,15 +27,18 @@ class BitMatrix {
         std::vector<Node> nodes;
         size_t maxDistanceToCycle = 0;
         size_t maxCycleSize = 0;
+        size_t sinkCount = 0;
+        size_t sourceCount = 0;
+        size_t isolatedCount = 0;
+        size_t maxTreeSize = 0; // TODO
 
         bool identifySinks();
         size_t calculateMaxDistanceToCycle(size_t idx);
         bool reconstructDelegations();
         bool hasSingleDelegations();
         std::vector<size_t> reconstructDelegationEdges();
-
+        void calculateStats();
     };
-
 
 public:
     BitMatrix(size_t k_) : bits(k_, std::vector<bool>(k_, false)), k(k_) {}
@@ -43,6 +46,8 @@ public:
     BitMatrix(const std::string &input);
     BitMatrix(const std::vector<size_t>& edges);
     BitMatrix(uint64_t mask, size_t k_);
+
+    CondensedGraph m_condensed;
     
     bool at(size_t row, size_t col) const {
         if (row >= k || col >= k) throw std::out_of_range("Index out of range");
@@ -105,10 +110,10 @@ public:
     // Find Strongly Connected Components (SCCs)
     // Returns a vector "component" where component[i] = SCC id of vertex i
     std::vector<size_t> findSCCs() const ;
-    CondensedGraph buildCondensedGraph () const ;
+    void buildCondensedGraph () ;
     bool everyoneVoted() const ;
     // checks is this matrix can represent LP is it does, returns true and in out parameter is one of the possible delegation matrixes.
-    bool isLiquidProfileFast(BitMatrix & out) const;
+    bool isLiquidProfileFast(BitMatrix & out);
     bool isLiquidProfileSlow() const;
     bool dfsCandidateGraph(size_t v, std::vector<size_t>& edges) const;
 };

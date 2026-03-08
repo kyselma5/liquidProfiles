@@ -4,241 +4,425 @@
 #include <vector>
 #include "bitmatrix.h"
 
+template<typename T>
+void printVector(const std::vector<T> & v) { 
+    for(const auto & e:v) {
+        std::cout << e << ", ";
+    }
+    std::cout << std::endl;
+}
+
 class AxiomChecker {
 private:
     const BitMatrix& m;
-    size_t n;
+    size_t V;
+    size_t C;
 
 public:
-    AxiomChecker(const BitMatrix& matrix) : m(matrix), n(matrix.size()) {}
+    AxiomChecker(const BitMatrix& matrix) : m(matrix), V(matrix.size()), C(matrix.size()) {}
 
-    size_t approvedCount(size_t voter, const std::vector<size_t>& W) {
-        size_t cnt = 0;
-        for (auto c : W)
-            if (m.at(voter, c)) cnt++;
-        return cnt;
-    }
+    bool isJRFast(const std::vector<size_t>& W, size_t k) {
+        
+        for(size_t c = 0; c < C; c++) {
 
-    size_t groupApprovedUnion(const std::vector<size_t>& group, const std::vector<size_t>& W) {
-        std::vector<bool> seen(n, false);
-
-        for (auto v : group) {
-            for (auto c : W) {
-                if (m.at(v, c))
-                    seen[c] = true;
-            }
-        }
-
-        return std::count(seen.begin(), seen.end(), true);
-    }
-
-    size_t countVotersApprovingAll(const std::vector<size_t>& S) {
-        size_t count = 0;
-
-        for (size_t v = 0; v < n; ++v) {
-            bool ok = true;
-            for (auto c : S) {
-                if (!m.at(v, c)) {
-                    ok = false;
-                    break;
+            // find group of voters supporting c
+            // and count supporters, who are not represented in committee
+            size_t countNotRepresented = 0;
+            for(size_t v = 0; v < V; v++) {
+                if(m.at(v, c)) {
+                    bool represented = false;
+                    for(size_t e:W){
+                        if(m.at(v, e)) {
+                            represented = true;
+                            break;
+                        }
+                    }
+                    if(!represented){
+                        countNotRepresented++;
+                    }
                 }
             }
-            if (ok) count++;
-        }
 
-        return count;
-    }
-
-    size_t maxClaimForVoter(size_t voter, size_t k) {
-        std::vector<size_t> Ai;
-
-        for (size_t c = 0; c < n; ++c)
-            if (m.at(voter, c))
-                Ai.push_back(c);
-
-        size_t best = 0;
-        size_t mAi = Ai.size();
-
-        for (size_t mask = 1; mask < (1ULL << mAi); ++mask) {
-            std::vector<size_t> S;
-
-            for (size_t i = 0; i < mAi; ++i)
-                if (mask & (1ULL << i))
-                    S.push_back(Ai[i]);
-
-            size_t sSize = S.size();
-            size_t supporters = countVotersApprovingAll(S);
-
-            if (supporters * k >= sSize * n) {
-                best = std::max(best, sSize);
+            // check if the number of not represented voters is enough to form 1 cohesive group
+            if (countNotRepresented * k > V /*(*1)*/){
+                return false;
             }
         }
-
-        return best;
-    }
-
-    bool isJR(const std::vector<size_t>& W, size_t k) {
-        size_t quota = n / k;
-
-        for (size_t mask = 1; mask < (1ULL << n); ++mask) {
-            std::vector<size_t> group;
-
-            for (size_t i = 0; i < n; ++i)
-                if (mask & (1ULL << i))
-                    group.push_back(i);
-
-            if (group.size() < quota) continue;
-
-            for (size_t c = 0; c < n; ++c) {
-                bool allApprove = true;
-
-                for (auto v : group)
-                    if (!m.at(v, c))
-                        allApprove = false;
-
-                if (!allApprove) continue;
-
-                bool satisfied = false;
-
-                for (auto v : group)
-                    if (approvedCount(v, W) >= 1)
-                        satisfied = true;
-
-                if (!satisfied)
-                    return false;
-            }
-        }
-
         return true;
     }
 
-    bool isPJR(const std::vector<size_t>& W, size_t k) {
-        for (size_t ell = 1; ell <= k; ++ell) {
-            size_t quota = ell * n / k;
-
-            for (size_t mask = 1; mask < (1ULL << n); ++mask) {
-                std::vector<size_t> group;
-
-                for (size_t i = 0; i < n; ++i)
-                    if (mask & (1ULL << i))
-                        group.push_back(i);
-
-                if (group.size() < quota) continue;
-
-                size_t common = 0;
-
-                for (size_t c = 0; c < n; ++c) {
-                    bool ok = true;
-                    for (auto v : group)
-                        if (!m.at(v, c)) ok = false;
-                    if (ok) common++;
-                }
-
-                if (common < ell) continue;
-
-                size_t represented = groupApprovedUnion(group, W);
-
-                if (represented < ell)
-                    return false;
-            }
+    bool PJRhelper(const std::vector<size_t>& committee, size_t k, size_t maxCandidate, size_t l, std::vector<bool> voters) {
+        
+        if (l > k) {
+            // we already checked all (k and less)-cohesive groups 
+            return true;
+        }
+        //count voters
+        size_t voterCount = 0;
+        for(bool b : voters) {
+            if(b) {
+                voterCount++;
+            } 
+        }
+        // pruning the non l-cohesive groups
+        if(voterCount * k < l * V){
+            return true;
         }
 
+        if (l > 0){
+            //TODO check the largest group of voters supporting just l-1 winners is big enough
+            // probably do it by recursion through all supsets of W up to l-1 size
+        }
+
+        // recursive check for smaller groups of voters
+        for(size_t c = maxCandidate; c < C; c++) {
+
+            std::vector<bool> votersNew = voters;
+
+            for (size_t v = 0; v < V; v++) {
+                votersNew[v] = votersNew[v] && m.at(v, c);
+            }
+
+            if (!PJRhelper(committee, k, c+1, l+1, votersNew)) {
+                return false;
+            }
+        }
         return true;
     }
 
-    bool isEJR(const std::vector<size_t>& W, size_t k) {
-        for (size_t ell = 1; ell <= k; ++ell) {
-            size_t quota = ell * n / k;
-
-            for (size_t mask = 1; mask < (1ULL << n); ++mask) {
-                std::vector<size_t> group;
-
-                for (size_t i = 0; i < n; ++i)
-                    if (mask & (1ULL << i))
-                        group.push_back(i);
-
-                if (group.size() < quota) continue;
-
-                size_t common = 0;
-
-                for (size_t c = 0; c < n; ++c) {
-                    bool ok = true;
-                    for (auto v : group)
-                        if (!m.at(v, c)) ok = false;
-                    if (ok) common++;
-                }
-
-                if (common < ell) continue;
-
-                bool exists = false;
-
-                for (auto v : group)
-                    if (approvedCount(v, W) >= ell)
-                        exists = true;
-
-                if (!exists)
-                    return false;
-            }
-        }
-
-        return true;
-    }
-    bool isEJRplus(const std::vector<size_t>& W, size_t k) {
-        std::vector<bool> inW(n, false);
-        for (auto c : W) inW[c] = true;
-
-        for (size_t c = 0; c < n; ++c) {
-            if (inW[c]) continue;
-
-            for (size_t ell = 1; ell <= k; ++ell) {
-                size_t quota = ell * n / k;
-
-                for (size_t mask = 1; mask < (1ULL << n); ++mask) {
-                    std::vector<size_t> group;
-
-                    for (size_t i = 0; i < n; ++i)
-                        if (mask & (1ULL << i))
-                            group.push_back(i);
-
-                    if (group.size() < quota) continue;
-
-                    bool allApproveC = true;
-                    for (auto v : group)
-                        if (!m.at(v, c))
-                            allApproveC = false;
-
-                    if (!allApproveC) continue;
-
-                    bool bad = true;
-
-                    for (auto v : group)
-                        if (approvedCount(v, W) >= ell)
-                            bad = false;
-
-                    if (bad)
-                        return false;
-                }
-            }
-        }
-
-        return true;
+    bool isPJRFast(const std::vector<size_t>& W, size_t k) {
+        std::vector<bool> voters(V, true);
+        return PJRhelper(W, k, 0, 1, voters);
     }
 
-    bool isIR(const std::vector<size_t>& W, size_t k) {
-        for (size_t v = 0; v < n; ++v) {
+    bool EJRhelper(const std::vector<size_t>& W, size_t k, size_t maxCandidate, size_t l, std::vector<bool> voters) {
+        if (l > k) {
+            // we already checked all (k and less)-cohesive groups 
+            return true;
+        }
+        if (l > 0){
+            //count voters
+            size_t voterCount = 0;
+            for(bool b : voters) {
+                if(b) {
+                    voterCount++;
+                } 
+            }
+            // pruning the non l-cohesive groups
+            if(voterCount * k < l * V){
+                return true;
+            }
 
-            size_t claim = maxClaimForVoter(v, k);
+            // count how many voters are not represented by at least l elected 
+            size_t countNotRepresented = 0;
+            for(size_t v = 0; v < V; v++){
+                if(voters[v]){
+                    size_t countRepresentors = 0;
+                    for (size_t w:W) {
+                        if(m.at(v,w)) {
+                            countRepresentors++;
+                            if(countRepresentors == l) {
+                                break;
+                            }
+                        }
+                    }
+                    if(countRepresentors < l){
+                        countNotRepresented++;
+                    }
+                }
+            }
 
-            size_t approvedInW = 0;
-            for (auto c : W)
-                if (m.at(v, c))
-                    approvedInW++;
-
-            if (approvedInW < claim) {
+            //check if we have just found l cohesive and not enough represented group.
+            if(countNotRepresented * k > l * V){
                 return false;
             }
         }
 
+        // recursive check for l+1 cohesive groups of voters
+        for(size_t c = maxCandidate; c < C; c++) {
+
+            std::vector<bool> votersNew = voters;
+
+            for (size_t v = 0; v < V; v++) {
+                votersNew[v] = votersNew[v] && m.at(v, c);
+            }
+
+            if (!EJRhelper(W, k, c+1, l+1, votersNew)) {
+                return false;
+            }
+        }
         return true;
     }
+
+    bool isEJRFast(const std::vector<size_t>& W, size_t k) {
+        std::vector<bool> voters(V, true);
+        return EJRhelper(W, k, 0, 0, voters);
+    }
+
+    bool isEJRplusFast(const std::vector<size_t>& W, size_t k) {
+        // count of candidates in committee approved by each voter
+        std::vector<size_t> electedCount(V, 0);
+        for(size_t v = 0; v < V; v++) {
+            for(size_t w:W){
+                if (m.at(v, w)) {
+                    electedCount[v]++;
+                }
+            }
+        }
+
+        for(size_t c = 0; c < C; c++){
+            // filtering elected candidates
+            bool elected = false;
+            for(size_t e:W){
+                if (e == c){
+                    elected = true;
+                    break;
+                }
+            }
+            if (elected){
+                continue;
+            }
+
+            for(size_t l = 1; l <= k; l++) {
+                size_t underrepresentedSupportersCount = 0;
+                for(size_t v = 0; v < V; v++) {
+                    // counting all the voters approving c, which are also underrepresented.
+                    if(m.at(v, c) && electedCount[v] < l){
+                        underrepresentedSupportersCount++;
+                    }
+                }
+                if(underrepresentedSupportersCount*k >= l*V){
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    bool CShelper(size_t k, size_t t, size_t maxCandidate, const std::vector<size_t> & approvedCount, const std::vector<size_t> & electedCount) {
+        // if number of candidates in T is larger than k, we can stop
+        if (k < t){
+            return true;
+        }
+
+        // try to add all possible candidates to T
+        for(size_t c = maxCandidate; c < C; c++){
+
+            // add candidate c to counter of approved candidates in alternative committee
+            std::vector<size_t> newApprovedCount = approvedCount;
+            for(size_t v = 0; v < V; v++) {
+                if(m.at(v, c)) {
+                    newApprovedCount[v]++;
+                }
+            }
+
+            // count how many voters would be happier with T than W
+            // also count potential maximum number of voters if they would approve all the candidates added to T later
+            size_t countMoreHappyWithT = 0;
+            size_t countPotentialMoreHappyWithT = 0;
+            for(size_t v = 0; v < V; v++) {
+                if(newApprovedCount[v] > electedCount[v]){
+                    countMoreHappyWithT++;
+                }
+                if(newApprovedCount[v]+k-(t+1) > electedCount[v]){
+                    countPotentialMoreHappyWithT++;
+                }
+            }
+
+            // check the rule
+            if (countMoreHappyWithT*k >= (t+1)*V){
+                return false;
+            }
+            // if not enough people would be happy with best potential T, we can stop this branch anyway
+            if (countPotentialMoreHappyWithT*k < (t+1)*V){
+                continue;
+            }
+            if(!CShelper(k, t+1, c+1, newApprovedCount, electedCount)){
+                return false;
+            }
+        }
+        return true;
+    }
+
+    bool isCS(const std::vector<size_t>& W, size_t k) {
+        std::vector<size_t> electedCount(V, 0);
+        std::vector<size_t> approvedCount(V, 0);
+
+        // count approved count for each voter in W and set this count to 0 in T
+        for(size_t v = 0; v < V; v++) {
+            for(size_t w:W){
+                if (m.at(v, w)) {
+                    electedCount[v]++;
+                }
+            }
+        }
+        return CShelper(k, 0, 0, approvedCount, electedCount);
+    }
+
+    bool isSJRFast(const std::vector<size_t>& W, size_t k) {
+
+        for(size_t c = 0; c < C; c++) {
+
+            // count group of voters supporting c
+            // check if everyone from this group is represented
+            size_t countGroup = 0;
+            bool everyoneRepresented = true;
+            for(size_t v = 0; v < V; v++) {
+                if(m.at(v, c)) {
+                    countGroup++;
+
+                    bool voterRepresented = false;
+                    for(size_t w:W) {
+                        if (m.at(v, w)) {
+                            voterRepresented = true;
+                            break;
+                        }
+                    }
+                    everyoneRepresented &= voterRepresented;
+                }
+            }
+            if(countGroup*k > V && !everyoneRepresented) {
+                return false;
+            }
+
+        }
+        return true;
+    }
+
+    bool isLRFast(const std::vector<size_t>& W, size_t k) {
+
+        for(size_t c = 0; c < C; c++) {
+
+            // count supporters of candidate c
+            size_t supportersCount = 0;
+            for(size_t v = 0; v < V; v++){
+                supportersCount += m.at(v, c);
+            }
+            
+            // count how many candidates approved by c with c are in W
+            size_t commonCandidatesCount = 0;
+            for(size_t w:W){
+                if(c == w || m.at(c, w)){
+                    commonCandidatesCount++;
+                }
+            }
+
+            // for every l up to k check if c is enough supported 
+            for(size_t l = 1; l <= k; l++) {
+                if(supportersCount*k < l*V) {
+                    break;
+                }
+                // if he is supported enough, he should have at least l approved candidates in committee
+                if(commonCandidatesCount < std::max(commonCandidatesCount, l)){
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+        bool SEJRhelper(const std::vector<size_t>& W, size_t k, size_t maxCandidate, size_t l, std::vector<bool> voters) {
+        if (l > k) {
+            // we already checked all (k and less)-cohesive groups 
+            return true;
+        }
+        if (l > 0){
+            //count voters
+            size_t voterCount = 0;
+            for(bool b : voters) {
+                if(b) {
+                    voterCount++;
+                } 
+            }
+            // pruning the non l-cohesive groups
+            if(voterCount * k < l * V) {
+                return true;
+            }
+
+            // group is l cohesive, so it should hold, that everyone has at least l candidates in W
+            else {
+                for(size_t v = 0; v < V; v++) {
+                    if(voters[v]) {
+                        size_t count = 0;
+                        for(size_t w:W){
+                            if(m.at(v, w)){
+                                count++;
+                            }
+                        }
+                        if(count < l){
+                            return false;
+                        }
+                    }
+                }
+            }
+
+        }
+
+        // recursive check for l+1 cohesive groups of voters
+        for(size_t c = maxCandidate; c < C; c++) {
+
+            std::vector<bool> votersNew = voters;
+
+            for (size_t v = 0; v < V; v++) {
+                votersNew[v] = votersNew[v] && m.at(v, c);
+            }
+
+            if (!SEJRhelper(W, k, c+1, l+1, votersNew)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    bool isSEJRFast(const std::vector<size_t>& W, size_t k) {
+        std::vector<bool> voters(V, true);
+        return SEJRhelper(W, k, 0, 0, voters);
+    }
+
+    bool isSEJRPlusFast(const std::vector<size_t>& W, size_t k) {
+
+        // count how many candidates approved by voter were elected
+        std::vector<size_t> electedCount(V, 0);
+        for(size_t v = 0; v < V; v++) {
+            for(size_t w:W){
+                if (m.at(v, w)) {
+                    electedCount[v]++;
+                }
+            }
+        }
+
+        for(size_t c = 0; c < C; c++){
+            // filtering candidates in W
+            bool elected = false;
+            for(size_t e:W){
+                if (e == c){
+                    elected = true;
+                    break;
+                }
+            }
+            if (elected){
+                continue;
+            }
+
+            // find supporters for this candidate
+            std::vector<size_t> supporters;
+            for(size_t v = 0; v < V; v++){
+                if(m.at(v, c)) {
+                    supporters.push_back(v);
+                }
+            }
+            
+            // this should be correct (+-1) TODO discuss this against the definition.
+            size_t l = (supporters.size() * k) / V;
+
+            for(size_t s : supporters){
+                if (electedCount[s] < l) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
 };

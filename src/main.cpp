@@ -5,13 +5,7 @@
 #include "rules.h"
 #include "axioms.h"
 
-template<typename T>
-void printVector(const std::vector<T> & v) { 
-    for(const auto & e:v) {
-        std::cout << e << ", ";
-    }
-    std::cout << std::endl;
-}
+
 
 void printDelegationAndApprovalMatrix(size_t k, const std::vector<size_t> & edges) {
 
@@ -102,7 +96,7 @@ int main(int argc, char* argv[]) {
     size_t k = std::stoi(argv[1]);
 
     // generating 
-    printAllMatrixesOfGivenSize(k);
+    //printAllMatrixesOfGivenSize(k);
 
     // testing of IsLiquidProfile Method (for development and debug)
     // checkIsLiquidProfileMethod(k);
@@ -131,7 +125,7 @@ int main(int argc, char* argv[]) {
         std::cout << "Matrix is not a Liquid Profile\n";
     }
 
-    size_t numVoters = 20;
+    size_t numVoters = k;
     std::vector<size_t> v(numVoters);
     std::random_device rd;
     std::mt19937 gen(rd());
@@ -163,35 +157,113 @@ int main(int argc, char* argv[]) {
     //out2.print();
     std::cout << "check" << (in.transitiveClosure() == out2.transitiveClosure()) << std::endl;
 
+    std::vector<double> CC(k, 0);
+    CC[0] = 1;
+    std::vector<double> PAV(k, 0);
+    for(size_t i = 0; i < k; i++){
+        PAV[i] = 1/i;
+    }
+
     Rules r(in2);
-    size_t commiteeSize = 2;
-    printVector(r.approvalVoting(commiteeSize));
-    printVector(r.sequentialPhragmen(commiteeSize));
-    //printVector(r.thieleRule(commiteeSize, {1, 0, 0, 0, 0, 0, 0, 0, 0, 0}));
-    printVector(r.thieleGreedy(commiteeSize, {1, 0, 0, 0, 0, 0, 0, 0, 0, 0}));
-    printVector(r.thieleGreedy(commiteeSize, {1, 1/2, 1/3, 1/4, 1/5, 1/6, 1/7, 1/8, 1/9, 1/10}));
-    printVector(r.MES(commiteeSize));
-    printVector(r.GJCR(commiteeSize));
+    size_t committeeSize = 5;
+
+    auto resAV = r.approvalVoting(committeeSize);
+    auto resSP = r.sequentialPhragmen(committeeSize);
+    auto resCC = r.thieleGreedy(committeeSize, CC);
+    auto resPAV = r.thieleGreedy(committeeSize, PAV);
+    auto resMES = r.MES(committeeSize);
+    auto resGJCR = r.GJCR(committeeSize);
+
+    printVector(resAV);
+    printVector(resSP);
+    printVector(resCC);
+    printVector(resPAV);
+    printVector(resMES);
+    printVector(resGJCR);
 
     AxiomChecker a(in2);
-    std::cout << a.isJR(r.approvalVoting(commiteeSize), commiteeSize) << std::endl;
-    std::cout << a.isJR(r.sequentialPhragmen(commiteeSize), commiteeSize) << std::endl;
-    std::cout << a.isJR(r.MES(commiteeSize), commiteeSize) << std::endl;
-    std::cout << a.isJR(r.GJCR(commiteeSize), commiteeSize) << std::endl;
 
-    std::cout << a.isPJR(r.approvalVoting(commiteeSize), commiteeSize) << std::endl;
-    std::cout << a.isPJR(r.sequentialPhragmen(commiteeSize), commiteeSize) << std::endl;
-    std::cout << a.isPJR(r.MES(commiteeSize), commiteeSize) << std::endl;
-    std::cout << a.isPJR(r.GJCR(commiteeSize), commiteeSize) << std::endl;
+    std::cout << "     AV SP CC PAV MES GJCR\nJR   :";
 
-    std::cout << a.isEJR(r.approvalVoting(commiteeSize), commiteeSize) << std::endl;
-    std::cout << a.isEJR(r.sequentialPhragmen(commiteeSize), commiteeSize) << std::endl;
-    std::cout << a.isEJR(r.MES(commiteeSize), commiteeSize) << std::endl;
-    std::cout << a.isEJR(r.GJCR(commiteeSize), commiteeSize) << std::endl;
+    std::cout << a.isJRFast(resAV, committeeSize) << "  ";
+    std::cout << a.isJRFast(resSP, committeeSize) << "  ";
+    std::cout << a.isJRFast(resCC, committeeSize) << "  ";
+    std::cout << a.isJRFast(resPAV, committeeSize) << "  ";
+    std::cout << a.isJRFast(resMES, committeeSize) << "  ";
+    std::cout << a.isJRFast(resGJCR, committeeSize) << "  ";
 
-    std::cout << a.isEJRplus(r.approvalVoting(commiteeSize), commiteeSize) << std::endl;
-    std::cout << a.isEJRplus(r.sequentialPhragmen(commiteeSize), commiteeSize) << std::endl;
-    std::cout << a.isEJRplus(r.MES(commiteeSize), commiteeSize) << std::endl;
-    std::cout << a.isEJRplus(r.GJCR(commiteeSize), commiteeSize) << std::endl;
+    std::cout << "\nPJR  :";
+
+    std::cout << a.isPJRFast(resAV, committeeSize) << "  ";
+    std::cout << a.isPJRFast(resSP, committeeSize) << "  ";
+    std::cout << a.isPJRFast(resCC, committeeSize) << "  ";
+    std::cout << a.isPJRFast(resPAV, committeeSize) << "  ";
+    std::cout << a.isPJRFast(resMES, committeeSize) << "  ";
+    std::cout << a.isPJRFast(resGJCR, committeeSize) << "  ";
+
+    std::cout << "\nEJR  :";
+
+    std::cout << a.isEJRFast(resAV, committeeSize) << "  ";
+    std::cout << a.isEJRFast(resSP, committeeSize) << "  ";
+    std::cout << a.isEJRFast(resCC, committeeSize) << "  ";
+    std::cout << a.isEJRFast(resPAV, committeeSize) << "  ";
+    std::cout << a.isEJRFast(resMES, committeeSize) << "  ";
+    std::cout << a.isEJRFast(resGJCR, committeeSize) << "  ";
+
+    std::cout << "\nEJR+ :";
+
+    std::cout << a.isEJRplusFast(resAV, committeeSize) << "  ";
+    std::cout << a.isEJRplusFast(resSP, committeeSize) << "  ";
+    std::cout << a.isEJRplusFast(resCC, committeeSize) << "  ";
+    std::cout << a.isEJRplusFast(resPAV, committeeSize) << "  ";
+    std::cout << a.isEJRplusFast(resMES, committeeSize) << "  ";
+    std::cout << a.isEJRplusFast(resGJCR, committeeSize) << "  ";
+
+    std::cout << "\nCS   :";
+
+    std::cout << a.isCS(resAV, committeeSize) << "  ";
+    std::cout << a.isCS(resSP, committeeSize) << "  ";
+    std::cout << a.isCS(resCC, committeeSize) << "  ";
+    std::cout << a.isCS(resPAV, committeeSize) << "  ";
+    std::cout << a.isCS(resMES, committeeSize) << "  ";
+    std::cout << a.isCS(resGJCR, committeeSize) << "  ";
+
+    std::cout << "\nSJR  :";
+
+    std::cout << a.isSJRFast(resAV, committeeSize) << "  ";
+    std::cout << a.isSJRFast(resSP, committeeSize) << "  ";
+    std::cout << a.isSJRFast(resCC, committeeSize) << "  ";
+    std::cout << a.isSJRFast(resPAV, committeeSize) << "  ";
+    std::cout << a.isSJRFast(resMES, committeeSize) << "  ";
+    std::cout << a.isSJRFast(resGJCR, committeeSize) << "  ";
+
+    std::cout << "\nLR   :";
+
+    std::cout << a.isLRFast(resAV, committeeSize) << "  ";
+    std::cout << a.isLRFast(resSP, committeeSize) << "  ";
+    std::cout << a.isLRFast(resCC, committeeSize) << "  ";
+    std::cout << a.isLRFast(resPAV, committeeSize) << "  ";
+    std::cout << a.isLRFast(resMES, committeeSize) << "  ";
+    std::cout << a.isLRFast(resGJCR, committeeSize) << "  ";
+
+    std::cout << "\nSEJR :";
+
+    std::cout << a.isSEJRFast(resAV, committeeSize) << "  ";
+    std::cout << a.isSEJRFast(resSP, committeeSize) << "  ";
+    std::cout << a.isSEJRFast(resCC, committeeSize) << "  ";
+    std::cout << a.isSEJRFast(resPAV, committeeSize) << "  ";
+    std::cout << a.isSEJRFast(resMES, committeeSize) << "  ";
+    std::cout << a.isSEJRFast(resGJCR, committeeSize) << "  ";
+
+    std::cout << "\nSEJR+:";
+
+    std::cout << a.isSEJRPlusFast(resAV, committeeSize) << "  ";
+    std::cout << a.isSEJRPlusFast(resSP, committeeSize) << "  ";
+    std::cout << a.isSEJRPlusFast(resCC, committeeSize) << "  ";
+    std::cout << a.isSEJRPlusFast(resPAV, committeeSize) << "  ";
+    std::cout << a.isSEJRPlusFast(resMES, committeeSize) << "  ";
+    std::cout << a.isSEJRPlusFast(resGJCR, committeeSize) << "  ";
+
+    std::cout << std::endl;
     return 0;
 }

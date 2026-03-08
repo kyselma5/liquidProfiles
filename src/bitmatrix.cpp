@@ -8,7 +8,6 @@ bool BitMatrix::CondensedGraph::identifySinks() {
             nodes[i].sink = true;
             nodes[i].maxDistanceToSink = 0;
             nodes[i].finalDelegation = i;
-            maxCycleSize = std::max(maxCycleSize, nodes[i].condensedNodes.size());
             if (nodes[i].outEdges.size() != 1){
                 return false;
             }
@@ -28,7 +27,6 @@ size_t BitMatrix::CondensedGraph::calculateMaxDistanceToCycle(size_t idx) {
     for(auto & i:nodes[idx].outEdges){
         acc = std::max(acc,calculateMaxDistanceToCycle(i));
     }
-    maxDistanceToCycle = std::max(maxDistanceToCycle, nodes[idx].maxDistanceToSink = acc+1);
     return nodes[idx].maxDistanceToSink = acc+1;
 }
 
@@ -94,6 +92,23 @@ std::vector<size_t> BitMatrix::CondensedGraph::reconstructDelegationEdges(){
         }
     }
     return edges;
+}
+
+void BitMatrix::CondensedGraph::calculateStats() {
+    for (const auto & n:nodes) {
+        if (n.reverseEdges.size() == 0){
+            sourceCount++;
+            if (n.sink) {
+                isolatedCount++;
+            }
+        }
+        if (n.sink) {
+            maxTreeSize = std::max(maxTreeSize, n.reverseEdges.size());
+            maxCycleSize = std::max(maxCycleSize, n.condensedNodes.size());
+            sinkCount++;
+        }
+        maxDistanceToCycle = std::max(maxDistanceToCycle, n.maxDistanceToSink);
+    }
 }
 
 BitMatrix::BitMatrix(const std::string &input) {
@@ -207,7 +222,7 @@ std::vector<size_t> BitMatrix::findSCCs() const {
     return component;
 }
 
-BitMatrix::CondensedGraph BitMatrix::buildCondensedGraph () const {
+void BitMatrix::buildCondensedGraph () {
     std::vector<size_t> component = findSCCs();
     size_t componentcount = 1 + *std::max_element(component.begin(), component.end());
     CondensedGraph cg;
@@ -223,7 +238,7 @@ BitMatrix::CondensedGraph BitMatrix::buildCondensedGraph () const {
             }
         }
     }
-    return cg;
+    m_condensed = cg;
 }
 
 bool BitMatrix::everyoneVoted() const {
@@ -239,12 +254,13 @@ bool BitMatrix::everyoneVoted() const {
     return true;
 }
 
-bool BitMatrix::isLiquidProfileFast(BitMatrix & out) const {
+bool BitMatrix::isLiquidProfileFast(BitMatrix & out) {
     if (isTransitive() && everyoneVoted()) {
-        auto cg = buildCondensedGraph();
+        buildCondensedGraph();
 
-        if (cg.hasSingleDelegations()) {
-            out = BitMatrix(cg.reconstructDelegationEdges());
+        if (m_condensed.hasSingleDelegations()) {
+            out = BitMatrix(m_condensed.reconstructDelegationEdges());
+            m_condensed.calculateStats();
             return true;
         }
     }

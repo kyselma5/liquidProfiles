@@ -248,7 +248,7 @@ public:
         std::vector<bool> selected(n, false);
         std::vector<size_t> approvedCount(n, 0);
 
-        for (int ell = (int)committeeSize; ell >= 1; --ell) {
+        for (size_t l = committeeSize; l >= 1; --l) {
 
             bool added = true;
 
@@ -261,12 +261,12 @@ public:
                     size_t count = 0;
 
                     for (size_t v = 0; v < n; ++v) {
-                        if (m_matrix.at(v, c) && approvedCount[v] < (size_t)ell) {
+                        if (m_matrix.at(v, c) && approvedCount[v] < l) {
                             count++;
                         }
                     }
 
-                    if (count * committeeSize >= (size_t)ell * n) {
+                    if (count * committeeSize >= l * n) {
                         winners.push_back(c);
                         selected[c] = true;
 
