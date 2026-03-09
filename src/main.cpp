@@ -101,7 +101,8 @@ int main(int argc, char* argv[]) {
     // testing of IsLiquidProfile Method (for development and debug)
     // checkIsLiquidProfileMethod(k);
 
-    // here you can write your own matrix to check if it is LP and deconstruct possible delegations. 
+    // here you can write your own matrix to check if it is LP and deconstruct possible delegations.
+    /* 
     auto m = BitMatrix( "0 0 0 1 0 0 0 0 0\n"
                         "0 0 0 1 0 0 0 0 0\n"
                         "0 1 0 1 0 0 0 0 0\n"
@@ -124,7 +125,7 @@ int main(int argc, char* argv[]) {
     else {
         std::cout << "Matrix is not a Liquid Profile\n";
     }
-
+    */
     size_t numVoters = k;
     std::vector<size_t> v(numVoters);
     std::random_device rd;
@@ -133,12 +134,9 @@ int main(int argc, char* argv[]) {
     for (size_t i = 0; i < numVoters; ++i) {
         v[i] = dist(gen);
     }
-
-    std::cout << "------------------------\n";
-
+    
     BitMatrix out2(numVoters);
     BitMatrix in(v);
-     std::cout << "generated\n";
     BitMatrix in2 = in.transitiveClosure();
     std::cout << "transitiveClosure done\n";
 
@@ -151,11 +149,7 @@ int main(int argc, char* argv[]) {
     std::chrono::duration<double> elapsed = end - start;
     std::cout << "Time of calculation: " << elapsed.count() << " s\n";
 
-    std::cout << "check LP done\n";
-    //in.print();
-    std::cout << "\n";
-    //out2.print();
-    std::cout << "check" << (in.transitiveClosure() == out2.transitiveClosure()) << std::endl;
+    std::cout << "Sanity check " << (in.transitiveClosure() == out2.transitiveClosure()) << std::endl;
 
     std::vector<double> CC(k, 0);
     CC[0] = 1;

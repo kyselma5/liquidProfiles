@@ -31,8 +31,8 @@ public:
             for(size_t v = 0; v < V; v++) {
                 if(m.at(v, c)) {
                     bool represented = false;
-                    for(size_t e:W){
-                        if(m.at(v, e)) {
+                    for(size_t w:W){
+                        if(m.at(v, w)) {
                             represented = true;
                             break;
                         }
@@ -173,8 +173,8 @@ public:
         for(size_t c = 0; c < C; c++){
             // filtering elected candidates
             bool elected = false;
-            for(size_t e:W){
-                if (e == c){
+            for(size_t w:W){
+                if (w == c){
                     elected = true;
                     break;
                 }
@@ -308,21 +308,19 @@ public:
                 }
             }
 
-            // for every l up to k check if c is enough supported 
-            for(size_t l = 1; l <= k; l++) {
-                if(supportersCount*k < l*V) {
-                    break;
-                }
-                // if he is supported enough, he should have at least l approved candidates in committee
-                if(commonCandidatesCount < std::max(commonCandidatesCount, l)){
-                    return false;
-                }
+
+            // this should be correct (+-1) TODO discuss this against the definition.
+            size_t l = (supportersCount * k) / V;
+
+            // if he is supported enough, he should have at least l approved candidates in committee
+            if(commonCandidatesCount < std::max(commonCandidatesCount, l)){
+                return false;
             }
         }
         return true;
     }
 
-        bool SEJRhelper(const std::vector<size_t>& W, size_t k, size_t maxCandidate, size_t l, std::vector<bool> voters) {
+    bool SEJRhelper(const std::vector<size_t>& W, size_t k, size_t maxCandidate, size_t l, std::vector<bool> voters) {
         if (l > k) {
             // we already checked all (k and less)-cohesive groups 
             return true;
@@ -356,7 +354,6 @@ public:
                     }
                 }
             }
-
         }
 
         // recursive check for l+1 cohesive groups of voters
@@ -395,8 +392,8 @@ public:
         for(size_t c = 0; c < C; c++){
             // filtering candidates in W
             bool elected = false;
-            for(size_t e:W){
-                if (e == c){
+            for(size_t w:W){
+                if (w == c){
                     elected = true;
                     break;
                 }
