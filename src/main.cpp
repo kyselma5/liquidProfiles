@@ -213,6 +213,24 @@ int main(int argc, char* argv[]) {
     std::cout << a.isEJRplusFast(resMES, committeeSize) << "  ";
     std::cout << a.isEJRplusFast(resGJCR, committeeSize) << "  ";
 
+    std::cout << "\nIR   :";
+
+    std::cout << a.isIRFast(resAV, committeeSize) << "  ";
+    std::cout << a.isIRFast(resSP, committeeSize) << "  ";
+    std::cout << a.isIRFast(resCC, committeeSize) << "  ";
+    std::cout << a.isIRFast(resPAV, committeeSize) << "  ";
+    std::cout << a.isIRFast(resMES, committeeSize) << "  ";
+    std::cout << a.isIRFast(resGJCR, committeeSize) << "  ";
+
+    std::cout << "\nPR   :";
+
+    std::cout << a.isPRFast(resAV, committeeSize) << "  ";
+    std::cout << a.isPRFast(resSP, committeeSize) << "  ";
+    std::cout << a.isPRFast(resCC, committeeSize) << "  ";
+    std::cout << a.isPRFast(resPAV, committeeSize) << "  ";
+    std::cout << a.isPRFast(resMES, committeeSize) << "  ";
+    std::cout << a.isPRFast(resGJCR, committeeSize) << "  ";
+
     std::cout << "\nCS   :";
 
     std::cout << a.isCS(resAV, committeeSize) << "  ";

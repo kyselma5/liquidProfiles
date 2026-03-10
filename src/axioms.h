@@ -3,6 +3,7 @@
 #include <iostream>
 #include <vector>
 #include "bitmatrix.h"
+#include "other/maxflow2.h"
 
 template<typename T>
 void printVector(const std::vector<T> & v) { 
@@ -22,8 +23,10 @@ public:
     AxiomChecker(const BitMatrix& matrix) : m(matrix), V(matrix.size()), C(matrix.size()) {}
 
     bool isJRFast(const std::vector<size_t>& W, size_t k) {
-        
         for(size_t c = 0; c < C; c++) {
+            if(std::find(W.begin(), W.end(), c) == W.end()){
+                continue;
+            }
 
             // find group of voters supporting c
             // and count supporters, who are not represented in committee
@@ -70,19 +73,17 @@ public:
         }
 
         if (l > 0){
+            return false;
             //TODO check the largest group of voters supporting just l-1 winners is big enough
             // probably do it by recursion through all supsets of W up to l-1 size
         }
 
         // recursive check for smaller groups of voters
         for(size_t c = maxCandidate; c < C; c++) {
-
             std::vector<bool> votersNew = voters;
-
             for (size_t v = 0; v < V; v++) {
                 votersNew[v] = votersNew[v] && m.at(v, c);
             }
-
             if (!PJRhelper(committee, k, c+1, l+1, votersNew)) {
                 return false;
             }
@@ -200,6 +201,78 @@ public:
         return true;
     }
 
+    size_t IRhelper(size_t s, size_t k, size_t maxCandidate, const std::vector<bool> & NS, const std::vector<bool>& Ai) {
+        
+        size_t res = s;
+
+        for(size_t c = maxCandidate; c < C; c++) {
+
+            if(!Ai[c]){
+                continue;
+            }
+
+            std::vector<bool> newNS = NS;
+            size_t countNewNS = 0;
+            for(size_t v = 0; v < V; v++){
+                if (!m.at(v,c)){
+                    newNS[v] = false;
+                }
+                countNewNS += newNS[v];
+            }
+            if(countNewNS * k < (s+1) * V) {
+                continue;
+            }
+            res = std::max(res, IRhelper(s+1, k, c+1, newNS, Ai));
+        }
+        return res;
+    }
+
+    bool isIRFast(const std::vector<size_t>& W, size_t k) {
+        for(size_t v = 0; v < V; v++) {
+
+            std::vector<bool> Ai(C, false);
+            for(size_t c = 0; c < C; c++){
+                if(m.at(v, c)){
+                    Ai[c] = true;
+                }
+            }
+
+            size_t representCount = 0;
+            for(size_t w:W) {
+                if(m.at(v, w)) {
+                    representCount++;
+                }
+            }
+            std::vector<bool> NS(V, true);
+            if(representCount < IRhelper(0, k, 0, NS, Ai)){
+                return false;
+            }
+        }
+        return true;
+    }
+
+    bool isPRFast(const std::vector<size_t>& W, size_t k) {
+        if(V%k != 0) {
+            std::cout << "-";
+            return false;
+        }
+        max_flow<1000, size_t> network;
+
+        for(size_t v = 0; v < V; v++){
+            network.add(0, v+1, 1);
+            for(size_t w:W){
+                if(m.at(v, w)){
+                    network.add(1+v, 1+V+w, 1);
+                }
+            }
+        }
+        for(size_t w:W){
+            network.add(1+V+w, 1+V+k, V/k);
+        }
+
+        return (V == network.calc(0, 1+V+k));
+    }
+
     bool CShelper(size_t k, size_t t, size_t maxCandidate, const std::vector<size_t> & approvedCount, const std::vector<size_t> & electedCount) {
         // if number of candidates in T is larger than k, we can stop
         if (k < t){
@@ -299,22 +372,52 @@ public:
             for(size_t v = 0; v < V; v++){
                 supportersCount += m.at(v, c);
             }
-            
-            // count how many candidates approved by c with c are in W
-            size_t commonCandidatesCount = 0;
-            for(size_t w:W){
-                if(c == w || m.at(c, w)){
-                    commonCandidatesCount++;
-                }
-            }
-
 
             // this should be correct (+-1) TODO discuss this against the definition.
             size_t l = (supportersCount * k) / V;
+            
+            std::vector<size_t> cAndUpC;
+            cAndUpC.push_back(c);
+            for(size_t s = 0; s < C; s++) {
+                if(m.at(c, s)){
+                    cAndUpC.push_back(s);
+                }
+            }
 
-            // if he is supported enough, he should have at least l approved candidates in committee
-            if(commonCandidatesCount < std::max(commonCandidatesCount, l)){
-                return false;
+            if (cAndUpC.size() < l) {
+                for(size_t e:cAndUpC){
+                    bool found = false;
+                    for(size_t w:W){
+                        if(e == w){
+                            found = true;
+                            break;
+                        }
+                    }
+                    if(!found){
+                        return false;
+                    }
+                }
+            }
+            else {
+                size_t foundCount = 0;
+                for(size_t e:cAndUpC){
+                    bool found = false;
+                    for(size_t w:W){
+                        if(e == w){
+                            found = true;
+                            break;
+                        }
+                    }
+                    if(found){
+                        foundCount++;
+                    }
+                    if(foundCount >= l){
+                        break;
+                    }
+                }
+                if (foundCount < l) {
+                    return false;
+                }
             }
         }
         return true;
