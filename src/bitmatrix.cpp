@@ -98,14 +98,14 @@ void BitMatrix::CondensedGraph::calculateStats() {
     for (const auto & n:nodes) {
         if (n.reverseEdges.size() == 0){
             sourceCount++;
-            if (n.sink) {
-                isolatedCount++;
-            }
         }
         if (n.sink) {
             maxTreeSize = std::max(maxTreeSize, n.reverseEdges.size());
             maxCycleSize = std::max(maxCycleSize, n.condensedNodes.size());
             sinkCount++;
+            if(n.condensedNodes.size() == 1 && n.outEdges.size() == 1) {
+                isolatedCount++;
+            }
         }
         maxDistanceToCycle = std::max(maxDistanceToCycle, n.maxDistanceToSink);
     }
@@ -163,12 +163,12 @@ BitMatrix::BitMatrix(uint64_t mask, size_t k_) : bits(k_, std::vector<bool>(k_, 
     }
 }
 
-void BitMatrix::print() const {
+void BitMatrix::print(std::ostream& os) const {
     for (size_t i = 0; i < k; ++i) {
         for (size_t j = 0; j < k; ++j) {
-            std::cout << at(i, j) << " ";
+            os << at(i, j) << " ";
         }
-        std::cout << "\n";
+        os << "\n";
     }
 }
 

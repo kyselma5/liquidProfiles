@@ -1,165 +1,77 @@
 #include <iostream>
 #include <vector>
 #include <random>
+#include <fstream>
 #include "bitmatrix.h"
 #include "rules.h"
 #include "axioms.h"
 
+double JR_time = 0;
+double EJR_time = 0;
+double EJRplus_time = 0;
+double PR_time = 0;
+double CS_time = 0;
+double SJR_time = 0;
+double SEJRplus_time = 0;
 
 
-void printDelegationAndApprovalMatrix(size_t k, const std::vector<size_t> & edges) {
+void printProgressBar(size_t current, size_t total) {
+    const int barWidth = 40;
 
-    BitMatrix matrix = BitMatrix(k);
+    float progress = (float)current / total;
+    int pos = barWidth * progress;
 
-    for(size_t i = 0; i < k; i++){
-        matrix.set(i, edges[i], true);
+    std::cout << "\r[";
+    for (int i = 0; i < barWidth; i++) {
+        if (i < pos)
+            std::cout << "█";
+        else
+            std::cout << " ";
     }
-    std::cout << "----- Delegation matrix -----\n";
-    matrix.print();
-    std::cout << "-----  Approval matrix  -----\n";
-    (matrix.transitiveClosure()).print();
-    std::cout << "\n";
+
+    std::cout << "] " << int(progress * 100.0) << "%";
+    std::cout.flush();
 }
 
-// test for isLiquidProfile method. Works by generating all liquid profiles of given size. Then generates all possible matrixes of given size and prints all graphs that are LP but weren't recognized or vise versa.
-void checkIsLiquidProfileMethod(size_t k){
 
-    std::set<BitMatrix> mSet;
-
-    uint64_t kk = 1; //number of possible delegations
-    for(size_t i = 0; i < k; i++) {
-        kk *= k;
-    }
-
-    std::vector<size_t> edges(k, 0);
-
-    for(uint64_t num = 0; num < kk; num++) {
-        uint64_t currentNum = num;
-
-        //conversion from number i base k to k numbers representing edges
-        for(size_t i = 0; i < k; i++) {
-            edges[i] = currentNum%k;
-            currentNum /= k;
-        }
-
-        mSet.insert(BitMatrix(edges).transitiveClosure());
-    }
-
-    uint64_t max = (1ULL << (k * k));
-
-    for (uint64_t mask = 0; mask < max; ++mask) {
-
-        if (mask%1000000 == 0) {
-            std::cout << 100.0*mask/max << "percent done\n";
-        }
-
-        BitMatrix m(mask, k);
-        BitMatrix out(k);
-
-        if (m.isLiquidProfileFast(out) != (mSet.count(m) == 1)) {
-            m.print();
-            std::cout << "\n";
-        }
-    }
-}
-
-// simple generator 
-void printAllMatrixesOfGivenSize(size_t k) {
-
-    uint64_t kk = 1; //number of possible delegations
-    for(size_t i = 0; i < k; i++) {
-        kk *= k;
-    }
-
-    std::vector<size_t> edges(k, 0);
-
-    for(uint64_t num = 0; num < kk; num++) {
-        uint64_t currentNum = num;
-
-        //conversion from number i base k to k numbers representing edges
-        for(size_t i = 0; i < k; i++) {
-            edges[i] = currentNum%k;
-            currentNum /= k;
-        }
-
-        printDelegationAndApprovalMatrix(k, edges);
-    }
-}
-
-int main(int argc, char* argv[]) {
-
-    if (argc != 2) {
-        std::cerr << "Usage: " << argv[0] << " <k> (size of matrixes to be generated/tested)\n";
-        return 1;
-    }
-
-    size_t k = std::stoi(argv[1]);
-
-    // generating 
-    //printAllMatrixesOfGivenSize(k);
-
-    // testing of IsLiquidProfile Method (for development and debug)
-    // checkIsLiquidProfileMethod(k);
-
-    // here you can write your own matrix to check if it is LP and deconstruct possible delegations.
-    /* 
-    auto m = BitMatrix( "0 0 0 1 0 0 0 0 0\n"
-                        "0 0 0 1 0 0 0 0 0\n"
-                        "0 1 0 1 0 0 0 0 0\n"
-                        "0 0 0 1 0 0 0 0 0\n"
-                        "0 0 0 0 0 0 0 1 1\n"
-                        "0 0 0 0 0 0 0 1 1\n"
-                        "0 0 0 0 0 0 0 1 1\n"
-                        "0 0 0 0 0 0 0 1 1\n"
-                        "0 0 0 0 0 0 0 1 1");
-
-    BitMatrix out(m.size());
-
-    if (m.isLiquidProfileFast(out)) {
-        std::cout << "----approval profile----\n";
-        m.print();
-        std::cout << "--possible delegations--\n";
-        out.print();
-        std::cout << "\n";
-    }
-    else {
-        std::cout << "Matrix is not a Liquid Profile\n";
-    }
-    */
-    size_t numVoters = k;
-    std::vector<size_t> v(numVoters);
-    std::random_device rd;
+BitMatrix generateDelegatinMatrix(size_t size, std::random_device& rd) {
     std::mt19937 gen(rd());
-    std::uniform_int_distribution<size_t> dist(0, numVoters - 1);
-    for (size_t i = 0; i < numVoters; ++i) {
-        v[i] = dist(gen);
-    }
-    
-    BitMatrix out2(numVoters);
-    BitMatrix in(v);
-    BitMatrix in2 = in.transitiveClosure();
-    std::cout << "transitiveClosure done\n";
-
-    auto start = std::chrono::high_resolution_clock::now();
-
-    std::cout << "check LP "<<in2.isLiquidProfileFast(out2) << std::endl;
-
-    auto end = std::chrono::high_resolution_clock::now();
-
-    std::chrono::duration<double> elapsed = end - start;
-    std::cout << "Time of calculation: " << elapsed.count() << " s\n";
-
-    std::cout << "Sanity check " << (in.transitiveClosure() == out2.transitiveClosure()) << std::endl;
-
-    std::vector<double> CC(k, 0);
-    CC[0] = 1;
-    std::vector<double> PAV(k, 0);
-    for(size_t i = 0; i < k; i++){
-        PAV[i] = 1/i;
+    std::uniform_int_distribution<size_t> dist(0, size - 1);
+    std::vector<size_t> v(size);
+    for (size_t j = 0; j < size; j++) {
+        v[j] = dist(gen);
     }
 
-    Rules r(in2);
-    size_t committeeSize = 5;
+    return BitMatrix(v);
+}
+
+void generateRandomDelegationMatrixes(size_t count, size_t size, std::random_device& rd, const std::string& fileName) {
+
+    std::cout << "GENERATING\n";
+    std::ofstream out(fileName);
+    out << count << " " << size << "\n\n";
+
+    size_t prevPercentage = 0;
+
+    for (size_t i = 0; i < count; i++) {
+        if(100*i/count != prevPercentage) {
+            prevPercentage = 100*i/count;
+            printProgressBar(i, count);
+        }
+        generateDelegatinMatrix(size, rd).print(out);
+        out << "\n";
+    }
+    printProgressBar(count, count);
+    std::cout << std::endl;
+}
+
+void workWithMatrix(BitMatrix & m, size_t committeeSize, std::ofstream & os, const std::vector<double> & CC, const std::vector<double> & PAV) {
+    auto tc = m.transitiveClosure();
+    BitMatrix out(m.size());
+    tc.isLiquidProfileFast(out);
+
+    Rules r(tc);
+    AxiomChecker a(tc);
 
     auto resAV = r.approvalVoting(committeeSize);
     auto resSP = r.sequentialPhragmen(committeeSize);
@@ -168,114 +80,261 @@ int main(int argc, char* argv[]) {
     auto resMES = r.MES(committeeSize);
     auto resGJCR = r.GJCR(committeeSize);
 
-    printVector(resAV);
-    printVector(resSP);
-    printVector(resCC);
-    printVector(resPAV);
-    printVector(resMES);
-    printVector(resGJCR);
+    auto resSP_AV = r.approvalVoting(committeeSize, resSP);
+    auto resCC_AV = r.approvalVoting(committeeSize, resCC);
+    auto resPAV_AV = r.approvalVoting(committeeSize, resPAV);
+    auto resMES_AV = r.approvalVoting(committeeSize, resMES);
+    auto resGJCR_AV = r.approvalVoting(committeeSize, resGJCR);
 
-    AxiomChecker a(in2);
+    os << tc.m_condensed.maxTreeSize << "," 
+       << tc.m_condensed.maxCycleSize << "," 
+       << tc.m_condensed.maxDistanceToCycle << "," 
+       << tc.m_condensed.sinkCount << "," 
+       << tc.m_condensed.sourceCount << "," 
+       << tc.m_condensed.isolatedCount << "," 
+       << hammingDistance(resAV, resSP_AV) << ","
+       << hammingDistance(resAV, resCC_AV) << ","
+       << hammingDistance(resAV, resPAV_AV) << ","
+       << hammingDistance(resAV, resMES_AV) << ","
+       << hammingDistance(resAV, resGJCR_AV) << ",";
+    auto start = std::chrono::high_resolution_clock::now();
+    os << a.isJR(resAV, committeeSize) << ","
+       << a.isJR(resSP, committeeSize) << ","
+       << a.isJR(resCC, committeeSize) << ","
+       << a.isJR(resPAV, committeeSize) << ","
+       << a.isJR(resMES, committeeSize) << ","
+       << a.isJR(resGJCR, committeeSize) << ",";
+    JR_time += (std::chrono::high_resolution_clock::now() - start).count();
+    start = std::chrono::high_resolution_clock::now();
+    os << a.isEJR(resAV, committeeSize) << ","
+       << a.isEJR(resSP, committeeSize) << ","
+       << a.isEJR(resCC, committeeSize) << ","
+       << a.isEJR(resPAV, committeeSize) << ","
+       << a.isEJR(resMES, committeeSize) << ","
+       << a.isEJR(resGJCR, committeeSize) << ",";
+    EJR_time += (std::chrono::high_resolution_clock::now() - start).count();
+    start = std::chrono::high_resolution_clock::now();
+    os << a.isEJRplus(resAV, committeeSize) << ","
+       << a.isEJRplus(resSP, committeeSize) << ","
+       << a.isEJRplus(resCC, committeeSize) << ","
+       << a.isEJRplus(resPAV, committeeSize) << ","
+       << a.isEJRplus(resMES, committeeSize) << ","
+       << a.isEJRplus(resGJCR, committeeSize) << ",";
+    EJRplus_time += (std::chrono::high_resolution_clock::now() - start).count();
+    start = std::chrono::high_resolution_clock::now();
+    os << a.isPR(resAV, committeeSize) << ","
+       << a.isPR(resSP, committeeSize) << ","
+       << a.isPR(resCC, committeeSize) << ","
+       << a.isPR(resPAV, committeeSize) << ","
+       << a.isPR(resMES, committeeSize) << ","
+       << a.isPR(resGJCR, committeeSize) << ",";
+    PR_time += (std::chrono::high_resolution_clock::now() - start).count();
+    start = std::chrono::high_resolution_clock::now();
+    os << a.isCS(resAV, committeeSize) << ","
+       << a.isCS(resSP, committeeSize) << ","
+       << a.isCS(resCC, committeeSize) << ","
+       << a.isCS(resPAV, committeeSize) << ","
+       << a.isCS(resMES, committeeSize) << ","
+       << a.isCS(resGJCR, committeeSize) << ",";
+    CS_time += (std::chrono::high_resolution_clock::now() - start).count();
+    start = std::chrono::high_resolution_clock::now();
+    os << a.isSJR(resAV, committeeSize) << ","
+       << a.isSJR(resSP, committeeSize) << ","
+       << a.isSJR(resCC, committeeSize) << ","
+       << a.isSJR(resPAV, committeeSize) << ","
+       << a.isSJR(resMES, committeeSize) << ","
+       << a.isSJR(resGJCR, committeeSize) << ",";
+    SJR_time += (std::chrono::high_resolution_clock::now() - start).count();
+    start = std::chrono::high_resolution_clock::now();
+    os << a.isSEJRPlus(resAV, committeeSize) << ","
+       << a.isSEJRPlus(resSP, committeeSize) << ","
+       << a.isSEJRPlus(resCC, committeeSize) << ","
+       << a.isSEJRPlus(resPAV, committeeSize) << ","
+       << a.isSEJRPlus(resMES, committeeSize) << ","
+       << a.isSEJRPlus(resGJCR, committeeSize) << std::endl;
+    SEJRplus_time += (std::chrono::high_resolution_clock::now() - start).count();
+}
 
-    std::cout << "     AV SP CC PAV MES GJCR\nJR   :";
+void processMatricesFromFile(size_t committeeSize, const std::string& infilename, const std::string& outfilename) {
 
-    std::cout << a.isJRFast(resAV, committeeSize) << "  ";
-    std::cout << a.isJRFast(resSP, committeeSize) << "  ";
-    std::cout << a.isJRFast(resCC, committeeSize) << "  ";
-    std::cout << a.isJRFast(resPAV, committeeSize) << "  ";
-    std::cout << a.isJRFast(resMES, committeeSize) << "  ";
-    std::cout << a.isJRFast(resGJCR, committeeSize) << "  ";
+    std::cout << "PROCESSING\n";
+    std::ifstream in(infilename);
+    std::ofstream os(outfilename);
 
-    std::cout << "\nPJR  :";
+    os << "maxTreeSize" << "," 
+       << "maxCycleSize" << "," 
+       << "maxDistanceToCycle" << "," 
+       << "sinkCount" << "," 
+       << "sourceCount" << "," 
+       << "isolatedCount" << "," 
+       << "hammingDist_AV_to_SP_AV" << ","
+       << "hammingDist_AV_to_CC_AV" << ","
+       << "hammingDist_AV_to_PAV_AV" << ","
+       << "hammingDist_AV_to_MES_AV" << ","
+       << "hammingDist_AV_to_GJCR_AV" << ","
+       << "JR_AV" << ","
+       << "JR_SP" << ","
+       << "JR_CC" << ","
+       << "JR_PAV" << ","
+       << "JR_MES" << ","
+       << "JR_GJCR" << ","
+       << "EJR_AV" << ","
+       << "EJR_SP" << ","
+       << "EJR_CC" << ","
+       << "EJR_PAV" << ","
+       << "EJR_MES" << ","
+       << "EJR_GJCR" << ","
+       << "EJR+_AV" << ","
+       << "EJR+_SP" << ","
+       << "EJR+_CC" << ","
+       << "EJR+_PAV" << ","
+       << "EJR+_MES" << ","
+       << "EJR+_GJCR" << ","
+       << "PR_AV" << ","
+       << "PR_SP" << ","
+       << "PR_CC" << ","
+       << "PR_PAV" << ","
+       << "PR_MES" << ","
+       << "PR_GJCR" << ","
+       << "CS_AV" << ","
+       << "CS_SP" << ","
+       << "CS_CC" << ","
+       << "CS_PAV" << ","
+       << "CS_MES" << ","
+       << "CS_GJCR" << ","
+       << "SJR_AV" << ","
+       << "SJR_SP" << ","
+       << "SJR_CC" << ","
+       << "SJR_PAV" << ","
+       << "SJR_MES" << ","
+       << "SJR_GJCR" << ","
+       << "SEJR+_AV" << ","
+       << "SEJR+_SP" << ","
+       << "SEJR+_CC" << ","
+       << "SEJR+_PAV" << ","
+       << "SEJR+_MES" << ","
+       << "SEJR+_GJCR" << std::endl;
 
-    std::cout << a.isPJRFast(resAV, committeeSize) << "  ";
-    std::cout << a.isPJRFast(resSP, committeeSize) << "  ";
-    std::cout << a.isPJRFast(resCC, committeeSize) << "  ";
-    std::cout << a.isPJRFast(resPAV, committeeSize) << "  ";
-    std::cout << a.isPJRFast(resMES, committeeSize) << "  ";
-    std::cout << a.isPJRFast(resGJCR, committeeSize) << "  ";
+    size_t count, size;
+    in >> count >> size;
+    in.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+    in.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 
-    std::cout << "\nEJR  :";
+    std::vector<double> CC(size, 0);
+    CC[0] = 1;
+    std::vector<double> PAV(size, 0);
+    PAV[0] = 1;
+    for(size_t i = 1; i < size; i++){
+        PAV[i] = 1.0/i;
+    }
 
-    std::cout << a.isEJRFast(resAV, committeeSize) << "  ";
-    std::cout << a.isEJRFast(resSP, committeeSize) << "  ";
-    std::cout << a.isEJRFast(resCC, committeeSize) << "  ";
-    std::cout << a.isEJRFast(resPAV, committeeSize) << "  ";
-    std::cout << a.isEJRFast(resMES, committeeSize) << "  ";
-    std::cout << a.isEJRFast(resGJCR, committeeSize) << "  ";
+    size_t prevPercentage = 0;
 
-    std::cout << "\nEJR+ :";
+    for (size_t i = 0; i < count; i++) {
+        if(100*i/count != prevPercentage) {
+            prevPercentage = 100*i/count;
+            printProgressBar(i, count);
+        }
+        std::stringstream matrixStream;
+        std::string line;
 
-    std::cout << a.isEJRplusFast(resAV, committeeSize) << "  ";
-    std::cout << a.isEJRplusFast(resSP, committeeSize) << "  ";
-    std::cout << a.isEJRplusFast(resCC, committeeSize) << "  ";
-    std::cout << a.isEJRplusFast(resPAV, committeeSize) << "  ";
-    std::cout << a.isEJRplusFast(resMES, committeeSize) << "  ";
-    std::cout << a.isEJRplusFast(resGJCR, committeeSize) << "  ";
+        for (size_t r = 0; r < size; r++) {
+            std::getline(in, line);
+            matrixStream << line << "\n";
+        }
+        std::string matrixText = matrixStream.str();
 
-    std::cout << "\nIR   :";
+        BitMatrix m(matrixText);
 
-    std::cout << a.isIRFast(resAV, committeeSize) << "  ";
-    std::cout << a.isIRFast(resSP, committeeSize) << "  ";
-    std::cout << a.isIRFast(resCC, committeeSize) << "  ";
-    std::cout << a.isIRFast(resPAV, committeeSize) << "  ";
-    std::cout << a.isIRFast(resMES, committeeSize) << "  ";
-    std::cout << a.isIRFast(resGJCR, committeeSize) << "  ";
+        workWithMatrix(m, committeeSize, os, CC, PAV);
 
-    std::cout << "\nPR   :";
-
-    std::cout << a.isPRFast(resAV, committeeSize) << "  ";
-    std::cout << a.isPRFast(resSP, committeeSize) << "  ";
-    std::cout << a.isPRFast(resCC, committeeSize) << "  ";
-    std::cout << a.isPRFast(resPAV, committeeSize) << "  ";
-    std::cout << a.isPRFast(resMES, committeeSize) << "  ";
-    std::cout << a.isPRFast(resGJCR, committeeSize) << "  ";
-
-    std::cout << "\nCS   :";
-
-    std::cout << a.isCS(resAV, committeeSize) << "  ";
-    std::cout << a.isCS(resSP, committeeSize) << "  ";
-    std::cout << a.isCS(resCC, committeeSize) << "  ";
-    std::cout << a.isCS(resPAV, committeeSize) << "  ";
-    std::cout << a.isCS(resMES, committeeSize) << "  ";
-    std::cout << a.isCS(resGJCR, committeeSize) << "  ";
-
-    std::cout << "\nSJR  :";
-
-    std::cout << a.isSJRFast(resAV, committeeSize) << "  ";
-    std::cout << a.isSJRFast(resSP, committeeSize) << "  ";
-    std::cout << a.isSJRFast(resCC, committeeSize) << "  ";
-    std::cout << a.isSJRFast(resPAV, committeeSize) << "  ";
-    std::cout << a.isSJRFast(resMES, committeeSize) << "  ";
-    std::cout << a.isSJRFast(resGJCR, committeeSize) << "  ";
-
-    std::cout << "\nLR   :";
-
-    std::cout << a.isLRFast(resAV, committeeSize) << "  ";
-    std::cout << a.isLRFast(resSP, committeeSize) << "  ";
-    std::cout << a.isLRFast(resCC, committeeSize) << "  ";
-    std::cout << a.isLRFast(resPAV, committeeSize) << "  ";
-    std::cout << a.isLRFast(resMES, committeeSize) << "  ";
-    std::cout << a.isLRFast(resGJCR, committeeSize) << "  ";
-
-    std::cout << "\nSEJR :";
-
-    std::cout << a.isSEJRFast(resAV, committeeSize) << "  ";
-    std::cout << a.isSEJRFast(resSP, committeeSize) << "  ";
-    std::cout << a.isSEJRFast(resCC, committeeSize) << "  ";
-    std::cout << a.isSEJRFast(resPAV, committeeSize) << "  ";
-    std::cout << a.isSEJRFast(resMES, committeeSize) << "  ";
-    std::cout << a.isSEJRFast(resGJCR, committeeSize) << "  ";
-
-    std::cout << "\nSEJR+:";
-
-    std::cout << a.isSEJRPlusFast(resAV, committeeSize) << "  ";
-    std::cout << a.isSEJRPlusFast(resSP, committeeSize) << "  ";
-    std::cout << a.isSEJRPlusFast(resCC, committeeSize) << "  ";
-    std::cout << a.isSEJRPlusFast(resPAV, committeeSize) << "  ";
-    std::cout << a.isSEJRPlusFast(resMES, committeeSize) << "  ";
-    std::cout << a.isSEJRPlusFast(resGJCR, committeeSize) << "  ";
+        std::getline(in, line);
+    }
+    printProgressBar(count, count);
 
     std::cout << std::endl;
+    auto totalTime = (JR_time + EJR_time + EJRplus_time + PR_time + CS_time + SJR_time + SEJRplus_time)/100;
+
+    std::cout << "JR_time - " << JR_time/totalTime << " % EJR_time - " << EJR_time/totalTime 
+                << " % EJRplus_time - " << EJRplus_time/totalTime << " % PR_time - " << PR_time/totalTime 
+                << " % CS_time - " << CS_time/totalTime << " % SJR_time - " << SJR_time/totalTime 
+                << " % SEJRplus_time - " << SEJRplus_time/totalTime << " % " << std::endl;
+}
+
+bool endsWith(const std::string& str, const std::string& suffix) {
+    return str.size() >= suffix.size() && str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0;
+}
+
+int main(int argc, char* argv[]) {
+
+    bool generate = false;
+    bool process = false;
+
+    std::string matrixFile = "";
+    std::string resultsFile = "";
+
+    size_t committeeSize = 0;
+    size_t numberOfMatrixes = 0;
+    size_t matrixSize = 0;
+
+
+    for (int i = 1; i < argc; i++) {
+
+        std::string arg = argv[i];
+
+        if (arg == "-g" || arg == "--generate") {
+            generate = true;
+        }
+        else if (arg == "-p" || arg == "--process") {
+            process = true;
+        }
+        else if (endsWith(arg, ".txt")) {
+            matrixFile = arg;
+        }
+        else if (endsWith(arg, ".csv")) {
+            resultsFile = arg;
+        }
+        else if (arg == "-s") {
+            matrixSize = stoul(argv[++i]);
+        }        
+        else if (arg == "-n") {
+            numberOfMatrixes = stoul(argv[++i]);
+        }        
+        else if (arg == "-c") {
+            committeeSize = stoul(argv[++i]);
+        }
+        else {
+            std::cerr << "Unknown argument: " << arg << std::endl;
+        }
+    }
+
+    if(matrixFile == "") {
+        std::cout << "no file to read matrixes from or generate matrixes to (needs to be .txt file)\n";
+        return 1;
+    }
+    if(generate) {
+        if(numberOfMatrixes == 0) {
+            std::cout << "number of matrixes to generate not set [-n]\n";
+            return 1;
+        }
+        if(matrixSize == 0) {
+            std::cout << "size of matrixes to generate not set [-s]\n";
+            return 1;
+        }
+        std::random_device rd;
+        generateRandomDelegationMatrixes(numberOfMatrixes, matrixSize, rd, matrixFile);
+    }
+    if(process) {
+        if(resultsFile == "") {
+            std::cout << "no file to save results was given (needs to be .csv file)\n";
+            return 1;
+        }
+        if(committeeSize == 0) {
+            std::cout << "elected committee not set [-c]\n";
+            return 1;
+        }
+        processMatricesFromFile(committeeSize, matrixFile, resultsFile);
+    }
+    
     return 0;
 }

@@ -6,7 +6,7 @@
 #include "other/maxflow2.h"
 
 template<typename T>
-void printVector(const std::vector<T> & v) { 
+void printContainer(const T & v) { 
     for(const auto & e:v) {
         std::cout << e << ", ";
     }
@@ -22,7 +22,7 @@ private:
 public:
     AxiomChecker(const BitMatrix& matrix) : m(matrix), V(matrix.size()), C(matrix.size()) {}
 
-    bool isJRFast(const std::vector<size_t>& W, size_t k) {
+    bool isJR(const std::set<size_t>& W, size_t k) {
         for(size_t c = 0; c < C; c++) {
             if(std::find(W.begin(), W.end(), c) == W.end()){
                 continue;
@@ -53,8 +53,8 @@ public:
         }
         return true;
     }
-
-    bool PJRhelper(const std::vector<size_t>& committee, size_t k, size_t maxCandidate, size_t l, std::vector<bool> voters) {
+/*
+    bool PJRhelper(const std::set<size_t>& W, size_t k, size_t maxCandidate, size_t l, std::vector<bool> voters) {
         
         if (l > k) {
             // we already checked all (k and less)-cohesive groups 
@@ -84,19 +84,20 @@ public:
             for (size_t v = 0; v < V; v++) {
                 votersNew[v] = votersNew[v] && m.at(v, c);
             }
-            if (!PJRhelper(committee, k, c+1, l+1, votersNew)) {
+            if (!PJRhelper(W, k, c+1, l+1, votersNew)) {
                 return false;
             }
         }
         return true;
     }
 
-    bool isPJRFast(const std::vector<size_t>& W, size_t k) {
+    bool isPJR(const std::set<size_t>& W, size_t k) {
         std::vector<bool> voters(V, true);
         return PJRhelper(W, k, 0, 1, voters);
     }
+*/
 
-    bool EJRhelper(const std::vector<size_t>& W, size_t k, size_t maxCandidate, size_t l, std::vector<bool> voters) {
+    bool EJRhelper(const std::set<size_t>& W, size_t k, size_t maxCandidate, size_t l, std::vector<bool> voters) {
         if (l > k) {
             // we already checked all (k and less)-cohesive groups 
             return true;
@@ -155,12 +156,12 @@ public:
         return true;
     }
 
-    bool isEJRFast(const std::vector<size_t>& W, size_t k) {
+    bool isEJR(const std::set<size_t>& W, size_t k) {
         std::vector<bool> voters(V, true);
         return EJRhelper(W, k, 0, 0, voters);
     }
 
-    bool isEJRplusFast(const std::vector<size_t>& W, size_t k) {
+    bool isEJRplus(const std::set<size_t>& W, size_t k) {
         // count of candidates in committee approved by each voter
         std::vector<size_t> electedCount(V, 0);
         for(size_t v = 0; v < V; v++) {
@@ -227,7 +228,7 @@ public:
         return res;
     }
 
-    bool isIRFast(const std::vector<size_t>& W, size_t k) {
+    bool isIR(const std::set<size_t>& W, size_t k) {
         for(size_t v = 0; v < V; v++) {
 
             std::vector<bool> Ai(C, false);
@@ -251,12 +252,11 @@ public:
         return true;
     }
 
-    bool isPRFast(const std::vector<size_t>& W, size_t k) {
+    bool isPR(const std::set<size_t>& W, size_t k) {
         if(V%k != 0) {
-            std::cout << "-";
             return false;
         }
-        max_flow<1000, size_t> network;
+        max_flow<10000, size_t> network; //TODO
 
         for(size_t v = 0; v < V; v++){
             network.add(0, v+1, 1);
@@ -318,7 +318,7 @@ public:
         return true;
     }
 
-    bool isCS(const std::vector<size_t>& W, size_t k) {
+    bool isCS(const std::set<size_t>& W, size_t k) {
         std::vector<size_t> electedCount(V, 0);
         std::vector<size_t> approvedCount(V, 0);
 
@@ -333,7 +333,7 @@ public:
         return CShelper(k, 0, 0, approvedCount, electedCount);
     }
 
-    bool isSJRFast(const std::vector<size_t>& W, size_t k) {
+    bool isSJR(const std::set<size_t>& W, size_t k) {
 
         for(size_t c = 0; c < C; c++) {
 
@@ -363,7 +363,7 @@ public:
         return true;
     }
 
-    bool isLRFast(const std::vector<size_t>& W, size_t k) {
+    bool isLR(const std::set<size_t>& W, size_t k) {
 
         for(size_t c = 0; c < C; c++) {
 
@@ -423,7 +423,7 @@ public:
         return true;
     }
 
-    bool SEJRhelper(const std::vector<size_t>& W, size_t k, size_t maxCandidate, size_t l, std::vector<bool> voters) {
+    bool SEJRhelper(const std::set<size_t>& W, size_t k, size_t maxCandidate, size_t l, std::vector<bool> voters) {
         if (l > k) {
             // we already checked all (k and less)-cohesive groups 
             return true;
@@ -475,12 +475,12 @@ public:
         return true;
     }
 
-    bool isSEJRFast(const std::vector<size_t>& W, size_t k) {
+    bool isSEJR(const std::set<size_t>& W, size_t k) {
         std::vector<bool> voters(V, true);
         return SEJRhelper(W, k, 0, 0, voters);
     }
 
-    bool isSEJRPlusFast(const std::vector<size_t>& W, size_t k) {
+    bool isSEJRPlus(const std::set<size_t>& W, size_t k) {
 
         // count how many candidates approved by voter were elected
         std::vector<size_t> electedCount(V, 0);

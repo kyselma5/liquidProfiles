@@ -30,7 +30,7 @@ class BitMatrix {
         size_t sinkCount = 0;
         size_t sourceCount = 0;
         size_t isolatedCount = 0;
-        size_t maxTreeSize = 0; // TODO
+        size_t maxTreeSize = 0;
 
         bool identifySinks();
         size_t calculateMaxDistanceToCycle(size_t idx);
@@ -76,7 +76,7 @@ public:
 
     size_t size() const {return k;}
 
-    void print() const;
+    void print(std::ostream& os) const;
 
     bool isTransitive() const {
         return transitiveClosure() == *this;

@@ -2,7 +2,35 @@
 
 #include <iostream>
 #include <vector>
+#include <set>
 #include "bitmatrix.h"
+
+size_t hammingDistance(const std::set<size_t>& A, const std::set<size_t>& B) {
+    size_t distance = 0;
+
+    auto itA = A.begin();
+    auto itB = B.begin();
+
+    while (itA != A.end() && itB != B.end()) {
+        if (*itA < *itB) {
+            distance++;
+            ++itA;
+        }
+        else if (*itB < *itA) {
+            distance++;
+            ++itB;
+        }
+        else {
+            ++itA;
+            ++itB;
+        }
+    }
+
+    distance += std::distance(itA, A.end());
+    distance += std::distance(itB, B.end());
+
+    return distance;
+}
 
 class Rules
 {
@@ -12,7 +40,7 @@ private:
 public:
     Rules(const BitMatrix & matrix): m_matrix(matrix), n(matrix.size()){}
 
-    std::vector<size_t> approvalVoting(size_t committeeSize) {
+    std::set<size_t> approvalVoting(size_t committeeSize, std::set<size_t> winners = {}) {
         std::vector<size_t> candidateScores(n, 0);
         for(size_t i = 0; i < n; ++i){
             for(size_t j = 0; j < n; ++j){
@@ -30,16 +58,19 @@ public:
             return candidateScores[a] > candidateScores[b];
         });
 
-        if (committeeSize < n) {
-            res.resize(committeeSize);
+        for (auto w:res) {
+            if(winners.size() >= committeeSize){
+                break;
+            }
+            winners.insert(w);
         }
-        return res;
+        return winners;
     }
 
-    std::vector<size_t> sequentialPhragmen(size_t committeeSize) {
+    std::set<size_t> sequentialPhragmen(size_t committeeSize) {
         std::vector<double> budget(n, 0.0);
         std::vector<bool> selected(n, false);
-        std::vector<size_t> winners;
+        std::set<size_t> winners;
 
         while (winners.size() < committeeSize) {
             double bestTime = std::numeric_limits<double>::max();
@@ -72,7 +103,7 @@ public:
                 budget[v] += bestTime;
             }
 
-            winners.push_back(bestCandidate);
+            winners.insert(bestCandidate);
             selected[bestCandidate] = true;
 
             for (size_t v = 0; v < n; ++v) {
@@ -85,7 +116,7 @@ public:
         return winners;
     }
 
-    double computeScore(const std::vector<size_t>& committee, const std::vector<double>& w) {
+    double computeScore(const std::set<size_t>& committee, const std::vector<double>& w) {
         double totalScore = 0.0;
 
         for (size_t v = 0; v < n; ++v) {
@@ -105,8 +136,8 @@ public:
         return totalScore;
     }
 
-    void generate(size_t start, size_t depth, size_t committeeSize, std::vector<size_t>& current,
-                    std::vector<size_t>& best, double& bestScore, const std::vector<double>& w) {
+    void generate(size_t start, size_t depth, size_t committeeSize, std::set<size_t>& current,
+                    std::set<size_t>& best, double& bestScore, const std::vector<double>& w) {
 
         if (depth == committeeSize) {
             double score = computeScore(current, w);
@@ -118,15 +149,15 @@ public:
         }
 
         for (size_t i = start; i < n; ++i) {
-            current.push_back(i);
+            current.insert(i);
             generate(i + 1, depth + 1, committeeSize, current, best, bestScore, w);
-            current.pop_back();
+            current.erase(i);
         }
     }
 
-    std::vector<size_t> thieleRule(size_t committeeSize, const std::vector<double>& w) {
+    std::set<size_t> thieleRule(size_t committeeSize, const std::vector<double>& w) {
 
-        std::vector<size_t> current, best;
+        std::set<size_t> current, best;
         double bestScore = -1;
 
         generate(0, 0, committeeSize, current, best, bestScore, w);
@@ -134,9 +165,8 @@ public:
         return best;
     }
 
-    std::vector<size_t> thieleGreedy(size_t committeeSize, const std::vector<double>& w) {
+    std::set<size_t> thieleGreedy(size_t committeeSize, const std::vector<double>& w, std::set<size_t> winners = {}) {
 
-        std::vector<size_t> winners;
         std::vector<size_t> approvedCount(n, 0);
         std::vector<bool> used(n, false);
 
@@ -161,7 +191,7 @@ public:
                 }
             }
 
-            winners.push_back(bestCandidate);
+            winners.insert(bestCandidate);
             used[bestCandidate] = true;
 
             for (size_t v = 0; v < n; ++v) {
@@ -205,11 +235,11 @@ public:
         return std::numeric_limits<double>::infinity();
     }
 
-    std::vector<size_t> MES(size_t committeeSize) {
+    std::set<size_t> MES(size_t committeeSize) {
 
         std::vector<double> budget(n, double(committeeSize) / n);
         std::vector<bool> selected(n, false);
-        std::vector<size_t> winners;
+        std::set<size_t> winners;
 
         for (size_t step = 0; step < committeeSize; ++step) {
             double bestRho = std::numeric_limits<double>::infinity();
@@ -229,7 +259,7 @@ public:
                 break;
             }
 
-            winners.push_back(bestCandidate);
+            winners.insert(bestCandidate);
             selected[bestCandidate] = true;
 
             for (size_t v = 0; v < n; ++v) {
@@ -242,9 +272,9 @@ public:
         return winners;
     }
 
-    std::vector<size_t> GJCR(size_t committeeSize) {
+    std::set<size_t> GJCR(size_t committeeSize) {
 
-        std::vector<size_t> winners;
+        std::set<size_t> winners;
         std::vector<bool> selected(n, false);
         std::vector<size_t> approvedCount(n, 0);
 
@@ -267,7 +297,7 @@ public:
                     }
 
                     if (count * committeeSize >= l * n) {
-                        winners.push_back(c);
+                        winners.insert(c);
                         selected[c] = true;
 
                         for (size_t v = 0; v < n; ++v) {
