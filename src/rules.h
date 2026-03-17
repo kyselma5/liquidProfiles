@@ -35,10 +35,10 @@ size_t hammingDistance(const std::set<size_t>& A, const std::set<size_t>& B) {
 class Rules
 {
 private:
-    BitMatrix m_matrix;
+    BitMatrix & m_matrix;
     size_t n;
 public:
-    Rules(const BitMatrix & matrix): m_matrix(matrix), n(matrix.size()){}
+    Rules(BitMatrix & matrix): m_matrix(matrix), n(matrix.size()){}
 
     std::set<size_t> approvalVoting(size_t committeeSize, std::set<size_t> winners = {}) {
         std::vector<size_t> candidateScores(n, 0);
