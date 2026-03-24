@@ -10,7 +10,7 @@ using namespace std;
  *   - O(V^(1/2) E) for bipartite matching
  *   - O(min(V^(2/3), E^(1/2)) E) for unit capacity graphs
  */
-template<int V, class T>
+template<class T>
 class max_flow {
 	static const T INF = numeric_limits<T>::max();
 
@@ -19,12 +19,13 @@ class max_flow {
 		T cap, f;
 	};
 
-	vector<edge> adj[V];
-	int dist[V];
-	int ptr[V];
+	std::vector<std::vector<edge>> adj;
+	std::vector<int> dist;
+	std::vector<int> ptr;
+	int m_size;
 
 	bool bfs(int s, int t) {
-		memset(dist, -1, sizeof dist);
+		std::fill(dist.begin(), dist.end(), -1);
 		dist[s] = 0;
 		queue<int> q({ s });
 		while (!q.empty() && dist[t] == -1) {
@@ -57,7 +58,16 @@ class max_flow {
 	}
 
 public:
+	max_flow(int size): m_size(size){
+		adj.resize(m_size);
+		dist.resize(m_size);
+		ptr.resize(m_size);
+	}
+
 	void add(int u, int v, T cap=1, T rcap=0) {
+		if (u >= m_size || v >= m_size) {
+			throw std::out_of_range("Node index out of range in add()");
+		}
 		adj[u].push_back({ v, (int) adj[v].size(), cap, 0 });
 		adj[v].push_back({ u, (int) adj[u].size() - 1, rcap, 0 });
 	}
@@ -65,7 +75,7 @@ public:
 	T calc(int s, int t) {
 		T flow = 0;
 		while (bfs(s, t)) {
-			memset(ptr, 0, sizeof ptr);
+			std::fill(ptr.begin(), ptr.end(), 0);
 			while (T df = augment(s, INF, t))
 				flow += df;
 		}
@@ -73,7 +83,7 @@ public:
 	}
 
 	void clear() {
-		for (int n = 0; n < V; n++)
+		for (int n = 0; n < m_size; n++)
 			adj[n].clear();
 	}
 };

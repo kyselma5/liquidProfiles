@@ -161,6 +161,41 @@ public:
         return EJRhelper(W, k, 0, 0, voters);
     }
 
+    bool isEJRfast(const std::set<size_t>& W, size_t k) {
+
+        std::vector<size_t> electedCount(V, 0);
+        std::vector<size_t> candidateCount(V, 0);
+
+        for(size_t v = 0; v < V; v++) {
+            for(size_t c = 0; c < C; c++) {
+                candidateCount[v] += m.at(v, c);
+            }
+            for(auto w:W){
+                electedCount[v] += m.at(v, w);
+            }
+        }
+
+        for(size_t l = 1; l <= k; l++) {
+            std::vector<size_t> unsatisfiedRootedHere(V, 0);
+            for(size_t v = 0; v < V; v++) {
+                if(electedCount[v] < l) {
+                    for(size_t c = 0; c < C; c++) {
+                        unsatisfiedRootedHere[c] += m.at(v, c);
+                    }
+                }
+            }
+
+            for(size_t v = 0; v < V; v++) {
+                if((m.at(v, v) && candidateCount[v] >= l) || (!m.at(v, v) && candidateCount[v] >= l - 1)) {
+                    if (unsatisfiedRootedHere[v] * k > l * V) {
+                        return false;
+                    }
+                }
+            }
+        }
+        return true;
+    }
+
     bool isEJRplus(const std::set<size_t>& W, size_t k) {
         // count of candidates in committee approved by each voter
         std::vector<size_t> electedCount(V, 0);
@@ -256,8 +291,7 @@ public:
         if(V%k != 0) {
             return false;
         }
-        max_flow<10000, size_t> network; //TODO
-
+        max_flow<size_t> network(1+V+V+1);
         for(size_t v = 0; v < V; v++){
             network.add(0, v+1, 1);
             for(size_t w:W){
@@ -267,10 +301,10 @@ public:
             }
         }
         for(size_t w:W){
-            network.add(1+V+w, 1+V+k, V/k);
+            network.add(1+V+w, 1+V+V, V/k);
         }
 
-        return (V == network.calc(0, 1+V+k));
+        return (V == network.calc(0, 1+V+V));
     }
 
     bool CShelper(size_t k, size_t t, size_t maxCandidate, const std::vector<size_t> & approvedCount, const std::vector<size_t> & electedCount) {
@@ -480,7 +514,40 @@ public:
         return SEJRhelper(W, k, 0, 0, voters);
     }
 
-    bool isSEJRPlus(const std::set<size_t>& W, size_t k) {
+    bool isSEJRFast(const std::set<size_t>& W, size_t k) {
+        
+        std::vector<size_t> electedCount(V, 0);
+        std::vector<size_t> candidateCount(V, 0);
+        std::vector<std::vector<size_t>> rootedHere(V);
+
+        for(size_t v = 0; v < V; v++) {
+            for(size_t c = 0; c < C; c++) {
+                candidateCount[v] += m.at(v, c);
+                if (m.at(v, c)) {
+                    rootedHere[c].push_back(v);
+                }
+            }
+            for(auto w:W){
+                electedCount[v] += m.at(v, w);
+            }
+        }
+
+        for(size_t l = 1; l <= k; l++) {
+            for(size_t v = 0; v < V; v++) {
+                if(((m.at(v, v) && candidateCount[v] >= l) || (!m.at(v, v) && candidateCount[v] >= l - 1))
+                && rootedHere[v].size() * k > l * V) {
+                    for(auto r:rootedHere[v]) {
+                        if (electedCount[r] < l) {
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
+        return true;
+    }
+
+    bool isSEJRPlusOld(const std::set<size_t>& W, size_t k) {
 
         // count how many candidates approved by voter were elected
         std::vector<size_t> electedCount(V, 0);
@@ -519,6 +586,43 @@ public:
             for(size_t s : supporters){
                 if (electedCount[s] < l) {
                     return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    bool isSEJRPlus(const std::set<size_t>& W, size_t k) {
+
+        // count how many candidates approved by voter were elected
+        std::vector<size_t> electedCount(V, 0);
+        std::vector<std::vector<size_t>> supporters(V);
+
+        for(size_t v = 0; v < V; v++) {
+            for(size_t w:W){
+                if (m.at(v, w)) {
+                    electedCount[v]++;
+                }
+            }
+            for(size_t c = 0; c < C; c++){
+                if (m.at(v, c)) {
+                    supporters[c].push_back(v);
+                }
+            }
+        }
+        
+        for(size_t l = 1; l <= k; l++) {
+            for(size_t c = 0; c < C; c++){
+                if(W.count(c) == 1) {
+                    continue;
+                }
+
+                if (supporters[c].size() * k > l * V) {
+                    for(auto s:supporters[c]) {
+                        if(electedCount[s] < l) {
+                            return false;
+                        }
+                    }
                 }
             }
         }
