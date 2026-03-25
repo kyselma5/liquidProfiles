@@ -97,71 +97,7 @@ public:
     }
 */
 
-    bool EJRhelper(const std::set<size_t>& W, size_t k, size_t maxCandidate, size_t l, std::vector<bool> voters) {
-        if (l > k) {
-            // we already checked all (k and less)-cohesive groups 
-            return true;
-        }
-        if (l > 0){
-            //count voters
-            size_t voterCount = 0;
-            for(bool b : voters) {
-                if(b) {
-                    voterCount++;
-                } 
-            }
-            // pruning the non l-cohesive groups
-            if(voterCount * k < l * V){
-                return true;
-            }
-
-            // count how many voters are not represented by at least l elected 
-            size_t countNotRepresented = 0;
-            for(size_t v = 0; v < V; v++){
-                if(voters[v]){
-                    size_t countRepresentors = 0;
-                    for (size_t w:W) {
-                        if(m.at(v,w)) {
-                            countRepresentors++;
-                            if(countRepresentors == l) {
-                                break;
-                            }
-                        }
-                    }
-                    if(countRepresentors < l){
-                        countNotRepresented++;
-                    }
-                }
-            }
-
-            //check if we have just found l cohesive and not enough represented group.
-            if(countNotRepresented * k > l * V){
-                return false;
-            }
-        }
-
-        // recursive check for l+1 cohesive groups of voters
-        for(size_t c = maxCandidate; c < C; c++) {
-
-            std::vector<bool> votersNew = voters;
-
-            for (size_t v = 0; v < V; v++) {
-                votersNew[v] = votersNew[v] && m.at(v, c);
-            }
-
-            if (!EJRhelper(W, k, c+1, l+1, votersNew)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
     bool isEJR(const std::set<size_t>& W, size_t k) {
-        std::vector<bool> voters(V, true);
-        return EJRhelper(W, k, 0, 0, voters);
-    }
-
-    bool isEJRfast(const std::set<size_t>& W, size_t k) {
 
         std::vector<size_t> electedCount(V, 0);
         std::vector<size_t> candidateCount(V, 0);
@@ -367,7 +303,7 @@ public:
         return CShelper(k, 0, 0, approvedCount, electedCount);
     }
 
-    bool isSJR(const std::set<size_t>& W, size_t k) {
+    bool issJR(const std::set<size_t>& W, size_t k) {
 
         for(size_t c = 0; c < C; c++) {
 
@@ -399,122 +335,47 @@ public:
 
     bool isLR(const std::set<size_t>& W, size_t k) {
 
-        for(size_t c = 0; c < C; c++) {
+        std::vector<size_t> supporters(C, 0);
+        std::vector<size_t> CAndUpC(C, 0);
 
-            // count supporters of candidate c
-            size_t supportersCount = 0;
-            for(size_t v = 0; v < V; v++){
-                supportersCount += m.at(v, c);
+        for(size_t v = 0; v < V; v++) {
+            for(size_t c = 0; c < C; c++) {
+                supporters[c] += m.at(v, c);
+                CAndUpC[c] += ((v == c) || m.at(c, v));
             }
+        }
 
-            // this should be correct (+-1) TODO discuss this against the definition.
-            size_t l = (supportersCount * k) / V;
-            
-            std::vector<size_t> cAndUpC;
-            cAndUpC.push_back(c);
-            for(size_t s = 0; s < C; s++) {
-                if(m.at(c, s)){
-                    cAndUpC.push_back(s);
+        std::vector<size_t> electedCAndUpC(C, 0);
+        for(size_t w:W) {
+            for(size_t c = 0; c < C; c++) {
+                electedCAndUpC[c] += ((w == c) || m.at(c, w));
+            }
+        }
+
+        for(size_t l = 1; l <= k; l++) {
+            for(size_t c = 0; c < C; c++) {
+
+                if(supporters[c] * k < l * V) {
+                    continue;
                 }
-            }
 
-            if (cAndUpC.size() < l) {
-                for(size_t e:cAndUpC){
-                    bool found = false;
-                    for(size_t w:W){
-                        if(e == w){
-                            found = true;
-                            break;
-                        }
+                if(CAndUpC[c] >= l) {
+                    if(electedCAndUpC[c] < l){
+                        return false;
                     }
-                    if(!found){
+                }
+
+                else {
+                    if(electedCAndUpC[c] < CAndUpC[c]) {
                         return false;
                     }
                 }
             }
-            else {
-                size_t foundCount = 0;
-                for(size_t e:cAndUpC){
-                    bool found = false;
-                    for(size_t w:W){
-                        if(e == w){
-                            found = true;
-                            break;
-                        }
-                    }
-                    if(found){
-                        foundCount++;
-                    }
-                    if(foundCount >= l){
-                        break;
-                    }
-                }
-                if (foundCount < l) {
-                    return false;
-                }
-            }
         }
         return true;
     }
 
-    bool SEJRhelper(const std::set<size_t>& W, size_t k, size_t maxCandidate, size_t l, std::vector<bool> voters) {
-        if (l > k) {
-            // we already checked all (k and less)-cohesive groups 
-            return true;
-        }
-        if (l > 0){
-            //count voters
-            size_t voterCount = 0;
-            for(bool b : voters) {
-                if(b) {
-                    voterCount++;
-                } 
-            }
-            // pruning the non l-cohesive groups
-            if(voterCount * k < l * V) {
-                return true;
-            }
-
-            // group is l cohesive, so it should hold, that everyone has at least l candidates in W
-            else {
-                for(size_t v = 0; v < V; v++) {
-                    if(voters[v]) {
-                        size_t count = 0;
-                        for(size_t w:W){
-                            if(m.at(v, w)){
-                                count++;
-                            }
-                        }
-                        if(count < l){
-                            return false;
-                        }
-                    }
-                }
-            }
-        }
-
-        // recursive check for l+1 cohesive groups of voters
-        for(size_t c = maxCandidate; c < C; c++) {
-
-            std::vector<bool> votersNew = voters;
-
-            for (size_t v = 0; v < V; v++) {
-                votersNew[v] = votersNew[v] && m.at(v, c);
-            }
-
-            if (!SEJRhelper(W, k, c+1, l+1, votersNew)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    bool isSEJR(const std::set<size_t>& W, size_t k) {
-        std::vector<bool> voters(V, true);
-        return SEJRhelper(W, k, 0, 0, voters);
-    }
-
-    bool isSEJRFast(const std::set<size_t>& W, size_t k) {
+    bool issEJR(const std::set<size_t>& W, size_t k) {
         
         std::vector<size_t> electedCount(V, 0);
         std::vector<size_t> candidateCount(V, 0);
@@ -535,7 +396,7 @@ public:
         for(size_t l = 1; l <= k; l++) {
             for(size_t v = 0; v < V; v++) {
                 if(((m.at(v, v) && candidateCount[v] >= l) || (!m.at(v, v) && candidateCount[v] >= l - 1))
-                && rootedHere[v].size() * k > l * V) {
+                && rootedHere[v].size() * k >= l * V) {
                     for(auto r:rootedHere[v]) {
                         if (electedCount[r] < l) {
                             return false;
@@ -547,52 +408,7 @@ public:
         return true;
     }
 
-    bool isSEJRPlusOld(const std::set<size_t>& W, size_t k) {
-
-        // count how many candidates approved by voter were elected
-        std::vector<size_t> electedCount(V, 0);
-        for(size_t v = 0; v < V; v++) {
-            for(size_t w:W){
-                if (m.at(v, w)) {
-                    electedCount[v]++;
-                }
-            }
-        }
-
-        for(size_t c = 0; c < C; c++){
-            // filtering candidates in W
-            bool elected = false;
-            for(size_t w:W){
-                if (w == c){
-                    elected = true;
-                    break;
-                }
-            }
-            if (elected){
-                continue;
-            }
-
-            // find supporters for this candidate
-            std::vector<size_t> supporters;
-            for(size_t v = 0; v < V; v++){
-                if(m.at(v, c)) {
-                    supporters.push_back(v);
-                }
-            }
-            
-            // this should be correct (+-1) TODO discuss this against the definition.
-            size_t l = (supporters.size() * k) / V;
-
-            for(size_t s : supporters){
-                if (electedCount[s] < l) {
-                    return false;
-                }
-            }
-        }
-        return true;
-    }
-
-    bool isSEJRPlus(const std::set<size_t>& W, size_t k) {
+    bool issEJRplus(const std::set<size_t>& W, size_t k) {
 
         // count how many candidates approved by voter were elected
         std::vector<size_t> electedCount(V, 0);
@@ -616,12 +432,13 @@ public:
                 if(W.count(c) == 1) {
                     continue;
                 }
+                if (supporters[c].size() * k < l * V) { 
+                    continue;
+                }
 
-                if (supporters[c].size() * k > l * V) {
-                    for(auto s:supporters[c]) {
-                        if(electedCount[s] < l) {
-                            return false;
-                        }
+                for(auto s:supporters[c]) {
+                    if(electedCount[s] < l) {
+                        return false;
                     }
                 }
             }
