@@ -37,6 +37,8 @@ class Rules
 private:
     BitMatrix & m_matrix;
     size_t n;
+
+    static constexpr double EPS = 1e-12;
 public:
     Rules(BitMatrix & matrix): m_matrix(matrix), n(matrix.size()){}
 
@@ -206,6 +208,7 @@ public:
 
     double computeRho(size_t c, const std::vector<double>& budget) {
         std::vector<double> supporters;
+        supporters.reserve(n);
 
         for (size_t v = 0; v < n; ++v) {
             if (m_matrix.at(v, c)) {
@@ -223,9 +226,15 @@ public:
         size_t m = supporters.size();
 
         for (size_t i = 0; i < m; ++i) {
-            double rho = (1.0 - prefixSum) / (m - i);
+            double remaining = 1.0 - prefixSum;
 
-            if (rho <= supporters[i]) {
+            if (remaining < 0 && remaining > -EPS) {
+                remaining = 0;
+            }
+
+            double rho = remaining / (m - i);
+
+            if (rho <= supporters[i] + EPS) {
                 return rho;
             }
 
@@ -264,11 +273,15 @@ public:
 
             for (size_t v = 0; v < n; ++v) {
                 if (m_matrix.at(v, bestCandidate)) {
-                    budget[v] -= std::min(budget[v], bestRho);
+                    double deduction = std::min(budget[v], bestRho);
+                    budget[v] -= deduction;
+
+                    if (budget[v] < 0 && budget[v] > -EPS) {
+                        budget[v] = 0;
+                    }
                 }
             }
         }
-
         return winners;
     }
 
