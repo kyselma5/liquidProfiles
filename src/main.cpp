@@ -142,16 +142,13 @@ void workWithMatrix(BitMatrix & m, const Config & cfg, std::ostream & os,
             os << "," << JR_AV << ","<< JR_SP << ","<< JR_CC << ","<< JR_PAV << ","<< JR_MES << ","<< JR_GJCR;
         }
         if(cfg.PJR) {
-            throw std::runtime_error("PJR is not implemented yet");
             start = std::chrono::steady_clock::now();
-            /*
             PJR_AV = a.isPJR(resAV, committeeSize);
             PJR_SP = a.isPJR(resSP, committeeSize);
             PJR_CC = a.isPJR(resCC, committeeSize);
             PJR_PAV = a.isPJR(resPAV, committeeSize);
             PJR_MES = a.isPJR(resMES, committeeSize);
             PJR_GJCR = a.isPJR(resGJCR, committeeSize);
-            */
             s.PJR_t += std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
             os << "," << PJR_AV << ","<< PJR_SP << ","<< PJR_CC << ","<< PJR_PAV << ","<< PJR_MES << ","<< PJR_GJCR;
  
@@ -330,6 +327,22 @@ void workWithMatrix(BitMatrix & m, const Config & cfg, std::ostream & os,
                 assert(!sJR_PAV || JR_PAV);
                 assert(!sJR_MES || JR_MES);
                 assert(!sJR_GJCR || JR_GJCR);
+            }
+            if(cfg.JR && cfg.PJR) {
+                assert(!PJR_AV || JR_AV);
+                assert(!PJR_SP || JR_SP);
+                assert(!PJR_CC || JR_CC);
+                assert(!PJR_PAV || JR_PAV);
+                assert(!PJR_MES || JR_MES);
+                assert(!PJR_GJCR || JR_GJCR);
+            }     
+            if(cfg.PJR && cfg.EJR) {
+                assert(!EJR_AV || PJR_AV);
+                assert(!EJR_SP || PJR_SP);
+                assert(!EJR_CC || PJR_CC);
+                assert(!EJR_PAV || PJR_PAV);
+                assert(!EJR_MES || PJR_MES);
+                assert(!EJR_GJCR || PJR_GJCR);
             }
         }
     }

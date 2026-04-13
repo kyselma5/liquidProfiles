@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <vector>
+#include <set>
 #include "bitmatrix.h"
 #include "other/maxflow2.h"
 
@@ -53,49 +54,110 @@ public:
         }
         return true;
     }
-/*
-    bool PJRhelper(const std::set<size_t>& W, size_t k, size_t maxCandidate, size_t l, std::vector<bool> voters) {
-        
-        if (l > k) {
-            // we already checked all (k and less)-cohesive groups 
-            return true;
-        }
-        //count voters
-        size_t voterCount = 0;
-        for(bool b : voters) {
-            if(b) {
-                voterCount++;
-            } 
-        }
-        // pruning the non l-cohesive groups
-        if(voterCount * k < l * V){
-            return true;
+
+    size_t PJRhelp(size_t toElect, const std::set<size_t> & currElected, 
+        const std::vector<std::set<size_t>> & nearSupporters, 
+        const std::vector<std::set<size_t>> & nearElected) {
+
+        //std::cout << toElect << " " << currElected.size() << std::endl;
+        if(currElected.size() == 0){
+            return 0;
         }
 
-        if (l > 0){
-            return false;
-            //TODO check the largest group of voters supporting just l-1 winners is big enough
-            // probably do it by recursion through all supsets of W up to l-1 size
-        }
+        size_t min = std::numeric_limits<size_t>::max();
+        for(size_t c:currElected){
+            auto copy = currElected;
+            copy.erase(c);
+            copy.insert(nearElected[c].begin(), nearElected[c].end());
 
-        // recursive check for smaller groups of voters
-        for(size_t c = maxCandidate; c < C; c++) {
-            std::vector<bool> votersNew = voters;
-            for (size_t v = 0; v < V; v++) {
-                votersNew[v] = votersNew[v] && m.at(v, c);
+            min = std::min(min, nearSupporters[c].size() + // see how many voters we can add if we accept c
+                                (nearSupporters[c].count(c) == 0) + // we also need to count c itself if its not already in nearSupporters
+                                (toElect > 0 ? PJRhelp(toElect-1, copy, nearSupporters, nearElected) : 0)); // if there is more room we recurse down, otherwise we can stop the recursion 
+        }
+        return min;
+    }
+
+    bool isPJR(const std::set<size_t>& W, size_t k) {
+
+        BitMatrix out(m.size());
+        BitMatrix copy = m;
+        copy.isLiquidProfileFast(out);
+
+        std::vector<size_t> voterDelegations(V, 0);
+        std::vector<std::set<size_t>> reverseVoterDelegations(V, std::set<size_t> {});
+
+        for(size_t v = 0; v < V; v++) {
+            for(size_t c = 0; c < C; c++) {
+                if(out.at(v, c)) {
+                    voterDelegations[v] = c;
+                }
+                if(out.at(c, v)) {
+                    reverseVoterDelegations[c].insert(v);
+                }
             }
-            if (!PJRhelper(W, k, c+1, l+1, votersNew)) {
-                return false;
+        }
+
+        std::vector<std::set<size_t>> nearElected(V, std::set<size_t> {});
+        std::vector<std::set<size_t>> nearSupporters(V, std::set<size_t> {});
+
+        for(size_t v = 0; v < V; v++) {
+            std::vector<bool> visited(V, false);
+            std::queue<size_t> q;
+            q.push(v);
+            visited[v] = true;
+
+            while(!q.empty()) {
+                size_t curr = q.front();
+                q.pop();
+                for(size_t r:reverseVoterDelegations[curr]) {
+                    if(W.count(r) == 1){
+                        nearElected[v].insert(r);
+                    }
+                    if(W.count(r) == 0 && !visited[r]){
+                        nearSupporters[v].insert(r);
+                        q.push(r);
+                        visited[r] = true;
+                    }
+                }
+            }
+        }
+        
+        std::vector<size_t> electedCount(V, 0);
+        std::vector<size_t> candidateCount(V, 0);
+        std::vector<std::vector<size_t>> rootedHere(V);
+
+        for(size_t v = 0; v < V; v++) {
+            for(size_t c = 0; c < C; c++) {
+                candidateCount[v] += m.at(v, c);
+                if (m.at(v, c)) {
+                    rootedHere[c].push_back(v);
+                }
+            }
+            for(auto w:W){
+                electedCount[v] += m.at(v, w);
+            }
+        }
+
+        for(size_t l = 1; l <= k; l++) {
+            for(size_t v = 0; v < V; v++) {
+                if(((m.at(v, v) && candidateCount[v] >= l) || (!m.at(v, v) && candidateCount[v] >= l - 1))
+                && rootedHere[v].size() * k >= l * V) {
+
+                    // voters in rootedHere are l-cohesive
+
+                    if(l <= electedCount[v]){
+                        continue;
+                    }
+
+                    size_t minVoters = PJRhelp(l-electedCount[v], nearElected[v], nearSupporters, nearElected);
+                    if(l * V < k * minVoters) {
+                        return false;
+                    }
+                }
             }
         }
         return true;
     }
-
-    bool isPJR(const std::set<size_t>& W, size_t k) {
-        std::vector<bool> voters(V, true);
-        return PJRhelper(W, k, 0, 1, voters);
-    }
-*/
 
     bool isEJR(const std::set<size_t>& W, size_t k) {
 
@@ -335,38 +397,38 @@ public:
 
     bool isLR(const std::set<size_t>& W, size_t k) {
 
-        std::vector<size_t> supporters(C, 0);
-        std::vector<size_t> CAndUpC(C, 0);
+        std::vector<size_t> supportersCount(C, 0); // \sum_{v \in V} \mathbf{1}_{c \in A_v}
+        std::vector<size_t> CAndA_CCount(C, 0); // \lvert c \cup A_c \rvert
+        std::vector<size_t> electedCAndA_CCount(C, 0); // \lvert (c \cup A_c) \cap W \rvert
 
         for(size_t v = 0; v < V; v++) {
             for(size_t c = 0; c < C; c++) {
-                supporters[c] += m.at(v, c);
-                CAndUpC[c] += ((v == c) || m.at(c, v));
+                supportersCount[c] += m.at(v, c);
+                CAndA_CCount[c] += ((v == c) || m.at(c, v));
             }
         }
 
-        std::vector<size_t> electedCAndUpC(C, 0);
         for(size_t w:W) {
             for(size_t c = 0; c < C; c++) {
-                electedCAndUpC[c] += ((w == c) || m.at(c, w));
+                electedCAndA_CCount[c] += ((w == c) || m.at(c, w));
             }
         }
 
         for(size_t l = 1; l <= k; l++) {
             for(size_t c = 0; c < C; c++) {
 
-                if(supporters[c] * k < l * V) {
+                if(supportersCount[c] * k < l * V) {
                     continue;
                 }
 
-                if(CAndUpC[c] >= l) {
-                    if(electedCAndUpC[c] < l){
+                if(CAndA_CCount[c] >= l) {
+                    if(electedCAndA_CCount[c] < l){
                         return false;
                     }
                 }
 
                 else {
-                    if(electedCAndUpC[c] < CAndUpC[c]) {
+                    if(electedCAndA_CCount[c] < CAndA_CCount[c]) {
                         return false;
                     }
                 }
