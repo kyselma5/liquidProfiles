@@ -16,7 +16,6 @@ struct Stats{
     double PJR_t = 0;
     double EJR_t = 0;
     double EJRplus_t = 0;
-    double IR_t = 0;
     double LR_t = 0;
     double PR_t = 0;
     double CS_t = 0;
@@ -39,7 +38,7 @@ void printProgressBar(size_t current, size_t total) {
             std::cout << " ";
     }
 
-    std::cout << "] " << int(progress * 100.0) << "%";
+    std::cout << "] " << std::fixed << std::setprecision(2) << progress * 100.0 << "%";
     std::cout.flush();
 }
 
@@ -63,8 +62,8 @@ void generateRandomDelegationMatrixes(const Config & cfg, std::random_device& rd
     size_t prevPercentage = 0;
 
     for (size_t i = 0; i < cfg.numberOfMatrixes; i++) {
-        if(100*(i+1)/cfg.numberOfMatrixes != prevPercentage) {
-            prevPercentage = 100*(i+1)/cfg.numberOfMatrixes;
+        if(10000*(i+1)/cfg.numberOfMatrixes != prevPercentage) {
+            prevPercentage = 10000*(i+1)/cfg.numberOfMatrixes;
             printProgressBar(i+1, cfg.numberOfMatrixes);
         }
         generateDelegatinMatrix(cfg.matrixSize, rd).print(out);
@@ -123,12 +122,12 @@ void workWithMatrix(BitMatrix & m, const Config & cfg, std::ostream & os,
         << hammingDistance(resMES_AV, resGJCR_AV);
 
         std::chrono::steady_clock::time_point start;
-        bool JR_AV = false, PJR_AV = false, EJR_AV = false, EJRplus_AV = false, IR_AV = false, LR_AV = false, CS_AV = false, PR_AV = false, sJR_AV = false, sEJR_AV = false, sEJRplus_AV = false;
-        bool JR_SP = false, PJR_SP = false, EJR_SP = false, EJRplus_SP= false, IR_SP = false, LR_SP = false, CS_SP = false, PR_SP = false, sJR_SP = false, sEJR_SP = false, sEJRplus_SP = false;
-        bool JR_CC = false, PJR_CC = false, EJR_CC = false, EJRplus_CC= false, IR_CC = false, LR_CC = false, CS_CC = false, PR_CC = false, sJR_CC = false, sEJR_CC = false, sEJRplus_CC = false;
-        bool JR_PAV = false, PJR_PAV = false, EJR_PAV = false, EJRplus_PAV= false, IR_PAV = false, LR_PAV = false, CS_PAV = false, PR_PAV = false, sJR_PAV = false, sEJR_PAV = false, sEJRplus_PAV = false;
-        bool JR_MES = false, PJR_MES = false, EJR_MES = false, EJRplus_MES= false, IR_MES = false, LR_MES = false, CS_MES = false, PR_MES = false, sJR_MES = false, sEJR_MES = false, sEJRplus_MES = false;
-        bool JR_GJCR = false, PJR_GJCR = false, EJR_GJCR = false, EJRplus_GJCR= false, IR_GJCR = false, LR_GJCR = false, CS_GJCR = false, PR_GJCR = false, sJR_GJCR = false, sEJR_GJCR = false, sEJRplus_GJCR = false;
+        bool JR_AV = false, PJR_AV = false, EJR_AV = false, EJRplus_AV = false, LR_AV = false, CS_AV = false, PR_AV = false, sJR_AV = false, sEJR_AV = false, sEJRplus_AV = false;
+        bool JR_SP = false, PJR_SP = false, EJR_SP = false, EJRplus_SP= false, LR_SP = false, CS_SP = false, PR_SP = false, sJR_SP = false, sEJR_SP = false, sEJRplus_SP = false;
+        bool JR_CC = false, PJR_CC = false, EJR_CC = false, EJRplus_CC= false, LR_CC = false, CS_CC = false, PR_CC = false, sJR_CC = false, sEJR_CC = false, sEJRplus_CC = false;
+        bool JR_PAV = false, PJR_PAV = false, EJR_PAV = false, EJRplus_PAV= false, LR_PAV = false, CS_PAV = false, PR_PAV = false, sJR_PAV = false, sEJR_PAV = false, sEJRplus_PAV = false;
+        bool JR_MES = false, PJR_MES = false, EJR_MES = false, EJRplus_MES= false, LR_MES = false, CS_MES = false, PR_MES = false, sJR_MES = false, sEJR_MES = false, sEJRplus_MES = false;
+        bool JR_GJCR = false, PJR_GJCR = false, EJR_GJCR = false, EJRplus_GJCR= false, LR_GJCR = false, CS_GJCR = false, PR_GJCR = false, sJR_GJCR = false, sEJR_GJCR = false, sEJRplus_GJCR = false;
         
         if(cfg.JR) {
             start = std::chrono::steady_clock::now();
@@ -174,17 +173,6 @@ void workWithMatrix(BitMatrix & m, const Config & cfg, std::ostream & os,
             EJRplus_GJCR = a.isEJRplus(resGJCR, committeeSize);
             s.EJRplus_t += std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
             os << "," << EJRplus_AV << ","<< EJRplus_SP << ","<< EJRplus_CC << ","<< EJRplus_PAV << ","<< EJRplus_MES << ","<< EJRplus_GJCR;
-        }
-        if(cfg.IR) {
-            start = std::chrono::steady_clock::now();
-            IR_AV = a.isIR(resAV, committeeSize);
-            IR_SP = a.isIR(resSP, committeeSize);
-            IR_CC = a.isIR(resCC, committeeSize);
-            IR_PAV = a.isIR(resPAV, committeeSize);
-            IR_MES = a.isIR(resMES, committeeSize);
-            IR_GJCR = a.isIR(resGJCR, committeeSize);
-            s.IR_t += std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
-            os << "," << IR_AV << ","<< IR_SP << ","<< IR_CC << ","<< IR_PAV << ","<< IR_MES << ","<< IR_GJCR;
         }
         if(cfg.LR) {
             start = std::chrono::steady_clock::now();
@@ -263,14 +251,6 @@ void workWithMatrix(BitMatrix & m, const Config & cfg, std::ostream & os,
                 assert(sEJRplus_PAV == sEJR_PAV);
                 assert(sEJRplus_MES == sEJR_MES);
                 assert(sEJRplus_GJCR == sEJR_GJCR);
-            }
-            if(cfg.sEJRplus && cfg.IR) {
-                assert(sEJRplus_AV == IR_AV);
-                assert(sEJRplus_SP == IR_SP);
-                assert(sEJRplus_CC == IR_CC);
-                assert(sEJRplus_PAV == IR_PAV);
-                assert(sEJRplus_MES == IR_MES);
-                assert(sEJRplus_GJCR == IR_GJCR);
             }
             if(cfg.sEJRplus && cfg.LR) {
                 assert(sEJRplus_AV == LR_AV);
@@ -367,7 +347,6 @@ void processMatricesFromFile(const Config & cfg){
     if(cfg.PJR) {os << ",PJR_AV,PJR_SP,PJR_CC,PJR_PAV,PJR_MES,PJR_GJCR";}
     if(cfg.EJR) {os << ",EJR_AV,EJR_SP,EJR_CC,EJR_PAV,EJR_MES,EJR_GJCR";}
     if(cfg.EJRplus) {os << ",EJR+_AV,EJR+_SP,EJR+_CC,EJR+_PAV,EJR+_MES,EJR+_GJCR";}
-    if(cfg.IR) {os << ",IR_AV,IR_SP,IR_CC,IR_PAV,IR_MES,IR_GJCR";}
     if(cfg.LR) {os << ",LR_AV,LR_SP,LR_CC,LR_PAV,LR_MES,LR_GJCR";}
     if(cfg.CS) {os << ",CS_AV,CS_SP,CS_CC,CS_PAV,CS_MES,CS_GJCR";}
     if(cfg.PR) {os << ",PR_AV,PR_SP,PR_CC,PR_PAV,PR_MES,PR_GJCR";}
@@ -405,6 +384,7 @@ void processMatricesFromFile(const Config & cfg){
     Stats s;
 
     // --- THREADS ---
+    //size_t numThreads = 1;
     size_t numThreads = std::thread::hardware_concurrency();
     std::vector<std::thread> workers;
 
@@ -449,7 +429,6 @@ void processMatricesFromFile(const Config & cfg){
             s.PJR_t += ls.PJR_t;
             s.EJR_t += ls.EJR_t;
             s.EJRplus_t += ls.EJRplus_t;
-            s.IR_t += ls.IR_t;
             s.PR_t += ls.PR_t;
             s.CS_t += ls.CS_t;
             s.sJR_t += ls.sJR_t;
@@ -466,8 +445,8 @@ void processMatricesFromFile(const Config & cfg){
         size_t prevPercentage = 0;
 
         for (size_t i = 0; i < count; i++) {
-            if(100*(i+1)/count != prevPercentage) {
-                prevPercentage = 100*(i+1)/count;
+            if(10000*(i+1)/count != prevPercentage) {
+                prevPercentage = 10000*(i+1)/count;
                 printProgressBar(i+1, count);
             }
             std::stringstream matrixStream;
@@ -512,7 +491,7 @@ void processMatricesFromFile(const Config & cfg){
 
     std::cout << "\nDONE\n";
 
-    auto totalTime = (s.JR_t+s.PJR_t+s.EJR_t+s.EJRplus_t+s.IR_t+s.LR_t+s.PR_t+s.CS_t+s.sJR_t+s.sEJR_t+s.sEJRplus_t);
+    auto totalTime = (s.JR_t+s.PJR_t+s.EJR_t+s.EJRplus_t+s.LR_t+s.PR_t+s.CS_t+s.sJR_t+s.sEJR_t+s.sEJRplus_t);
 
     std::cout << "\n\nTotal axiom time - " << totalTime/1000 << std::endl;
     totalTime /= 100;
@@ -521,7 +500,6 @@ void processMatricesFromFile(const Config & cfg){
     std::cout << s.PJR_t/totalTime << " % PJR_time\n";
     std::cout << s.EJR_t/totalTime << " % EJR_time\n";
     std::cout << s.EJRplus_t/totalTime << " % EJRplus_time\n";
-    std::cout << s.IR_t/totalTime << " % IR_time\n";
     std::cout << s.LR_t/totalTime << " % LR_time\n";
     std::cout << s.PR_t/totalTime << " % PR_time\n";
     std::cout << s.CS_t/totalTime << " % CS_time\n";

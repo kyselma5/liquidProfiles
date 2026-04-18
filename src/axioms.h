@@ -55,26 +55,48 @@ public:
         return true;
     }
 
-    size_t PJRhelp(size_t toElect, const std::set<size_t> & currElected, 
-        const std::vector<std::set<size_t>> & nearSupporters, 
-        const std::vector<std::set<size_t>> & nearElected) {
-
-        //std::cout << toElect << " " << currElected.size() << std::endl;
-        if(currElected.size() == 0){
-            return 0;
+    bool PJRhelp(size_t l, size_t k, 
+        const std::set<size_t> & elected,
+        const std::set<size_t> & supporters, 
+        const std::set<size_t> & barrier, 
+        const std::vector<std::set<size_t>> & V_v, 
+        const std::vector<std::set<size_t>> & N_v, 
+        const std::vector<size_t> & delegations) {
+        
+        if(l * V <= k * supporters.size()) {
+            if (elected.size() < l) {
+                return false;
+            }
+            else {
+                return true;
+            }
+        }
+        if(elected.size() >= l) {
+            return true;
         }
 
-        size_t min = std::numeric_limits<size_t>::max();
-        for(size_t c:currElected){
-            auto copy = currElected;
-            copy.erase(c);
-            copy.insert(nearElected[c].begin(), nearElected[c].end());
+        for(size_t n:barrier){
 
-            min = std::min(min, nearSupporters[c].size() + // see how many voters we can add if we accept c
-                                (nearSupporters[c].count(c) == 0) + // we also need to count c itself if its not already in nearSupporters
-                                (toElect > 0 ? PJRhelp(toElect-1, copy, nearSupporters, nearElected) : 0)); // if there is more room we recurse down, otherwise we can stop the recursion 
+            auto supportersCopy = supporters;
+            auto barrierCopy = barrier;
+            auto electedCopy = elected;
+            electedCopy.insert(delegations[n]);
+
+            for(size_t i:barrier){
+                if(delegations[n] == delegations[i]){
+                    supportersCopy.insert(V_v[i].begin(), V_v[i].end());
+                    supportersCopy.insert(i);
+                    
+                    barrierCopy.erase(i);
+                    barrierCopy.insert(N_v[i].begin(), N_v[i].end());
+                }
+            }
+            
+            if (!PJRhelp(l, k, electedCopy, supportersCopy, barrierCopy, V_v, N_v, delegations)) {
+                return false;
+            }
         }
-        return min;
+        return true;
     }
 
     bool isPJR(const std::set<size_t>& W, size_t k) {
@@ -82,75 +104,71 @@ public:
         BitMatrix out(m.size());
         BitMatrix copy = m;
         copy.isLiquidProfileFast(out);
-
-        std::vector<size_t> voterDelegations(V, 0);
-        std::vector<std::set<size_t>> reverseVoterDelegations(V, std::set<size_t> {});
-
+        std::vector<size_t> delegations(V, 0);
         for(size_t v = 0; v < V; v++) {
             for(size_t c = 0; c < C; c++) {
                 if(out.at(v, c)) {
-                    voterDelegations[v] = c;
-                }
-                if(out.at(c, v)) {
-                    reverseVoterDelegations[c].insert(v);
+                    delegations[v] = c;
                 }
             }
         }
 
-        std::vector<std::set<size_t>> nearElected(V, std::set<size_t> {});
-        std::vector<std::set<size_t>> nearSupporters(V, std::set<size_t> {});
+        std::vector<std::set<size_t>> A_v_cap_W(V, std::set<size_t> {});
+        std::vector<std::set<size_t>> V_v(V, std::set<size_t> {});
+        std::vector<std::set<size_t>> N_v(V, std::set<size_t> {});
 
         for(size_t v = 0; v < V; v++) {
-            std::vector<bool> visited(V, false);
-            std::queue<size_t> q;
-            q.push(v);
-            visited[v] = true;
-
-            while(!q.empty()) {
-                size_t curr = q.front();
-                q.pop();
-                for(size_t r:reverseVoterDelegations[curr]) {
-                    if(W.count(r) == 1){
-                        nearElected[v].insert(r);
-                    }
-                    if(W.count(r) == 0 && !visited[r]){
-                        nearSupporters[v].insert(r);
-                        q.push(r);
-                        visited[r] = true;
-                    }
+            for(size_t c = 0; c < C; c++) {
+                if(m.at(v, c) && W.count(c)) {
+                    A_v_cap_W[v].insert(c);
                 }
             }
         }
-        
-        std::vector<size_t> electedCount(V, 0);
+
+        for(size_t v = 0; v < V; v++) {
+            for(size_t r = 0; r < V; r++) {
+                if((A_v_cap_W[r] == A_v_cap_W[v] && m.at(r, v))) {
+                    V_v[v].insert(r);
+                }
+            }
+        }
+
+        for(size_t v = 0; v < V; v++) {
+            for(size_t r = 0; r < V; r++) {
+                size_t i = delegations[r];
+                if(!V_v[v].count(r) && V_v[v].count(i)) {
+                    N_v[v].insert(r);
+                }
+            }
+        }
+
+        std::vector<std::set<size_t>> elected(V, std::set<size_t> {});
         std::vector<size_t> candidateCount(V, 0);
-        std::vector<std::vector<size_t>> rootedHere(V);
+        std::vector<size_t> rootedHere(V, 0);
 
         for(size_t v = 0; v < V; v++) {
             for(size_t c = 0; c < C; c++) {
                 candidateCount[v] += m.at(v, c);
-                if (m.at(v, c)) {
-                    rootedHere[c].push_back(v);
-                }
+                rootedHere[c] += m.at(v, c);
             }
             for(auto w:W){
-                electedCount[v] += m.at(v, w);
+                if(m.at(v, w)) {
+                    elected[v].insert(w);
+                }
             }
         }
 
         for(size_t l = 1; l <= k; l++) {
             for(size_t v = 0; v < V; v++) {
                 if(((m.at(v, v) && candidateCount[v] >= l) || (!m.at(v, v) && candidateCount[v] >= l - 1))
-                && rootedHere[v].size() * k >= l * V) {
+                && rootedHere[v] * k >= l * V) {
 
                     // voters in rootedHere are l-cohesive
 
-                    if(l <= electedCount[v]){
-                        continue;
-                    }
+                    std::set<size_t> alreadyElected = elected[v];
+                    if(W.count(v)) {alreadyElected.insert(v);}
 
-                    size_t minVoters = PJRhelp(l-electedCount[v], nearElected[v], nearSupporters, nearElected);
-                    if(l * V < k * minVoters) {
+                    if(!PJRhelp(l, k, alreadyElected, V_v[v], N_v[v], V_v, N_v, delegations)) {
                         return false;
                     }
                 }
@@ -185,7 +203,7 @@ public:
 
             for(size_t v = 0; v < V; v++) {
                 if((m.at(v, v) && candidateCount[v] >= l) || (!m.at(v, v) && candidateCount[v] >= l - 1)) {
-                    if (unsatisfiedRootedHere[v] * k > l * V) {
+                    if (unsatisfiedRootedHere[v] * k >= l * V) {
                         return false;
                     }
                 }
@@ -232,56 +250,6 @@ public:
             }
         }
 
-        return true;
-    }
-
-    size_t IRhelper(size_t s, size_t k, size_t maxCandidate, const std::vector<bool> & NS, const std::vector<bool>& Ai) {
-        
-        size_t res = s;
-
-        for(size_t c = maxCandidate; c < C; c++) {
-
-            if(!Ai[c]){
-                continue;
-            }
-
-            std::vector<bool> newNS = NS;
-            size_t countNewNS = 0;
-            for(size_t v = 0; v < V; v++){
-                if (!m.at(v,c)){
-                    newNS[v] = false;
-                }
-                countNewNS += newNS[v];
-            }
-            if(countNewNS * k < (s+1) * V) {
-                continue;
-            }
-            res = std::max(res, IRhelper(s+1, k, c+1, newNS, Ai));
-        }
-        return res;
-    }
-
-    bool isIR(const std::set<size_t>& W, size_t k) {
-        for(size_t v = 0; v < V; v++) {
-
-            std::vector<bool> Ai(C, false);
-            for(size_t c = 0; c < C; c++){
-                if(m.at(v, c)){
-                    Ai[c] = true;
-                }
-            }
-
-            size_t representCount = 0;
-            for(size_t w:W) {
-                if(m.at(v, w)) {
-                    representCount++;
-                }
-            }
-            std::vector<bool> NS(V, true);
-            if(representCount < IRhelper(0, k, 0, NS, Ai)){
-                return false;
-            }
-        }
         return true;
     }
 

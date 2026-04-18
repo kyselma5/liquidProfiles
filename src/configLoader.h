@@ -13,7 +13,6 @@ struct Config {
     bool PJR = false;
     bool EJR = false;
     bool EJRplus = false;
-    bool IR = false;
     bool LR = false;
     bool CS = false;
     bool PR = false;
@@ -47,7 +46,6 @@ void printConfig(const Config& cfg) {
     std::cout << "PJR: " << cfg.PJR << "\n";
     std::cout << "EJR: " << cfg.EJR << "\n";
     std::cout << "EJRplus: " << cfg.EJRplus << "\n";
-    std::cout << "IR: " << cfg.IR << "\n";
     std::cout << "LR: " << cfg.LR << "\n";
     std::cout << "CS: " << cfg.CS << "\n";
     std::cout << "PR: " << cfg.PR << "\n";
@@ -129,7 +127,6 @@ Config loadConfig(const std::string& filename) {
         else if (key == "PJR") cfg.PJR = toBool(value);
         else if (key == "EJR") cfg.EJR = toBool(value);
         else if (key == "EJRplus") cfg.EJRplus = toBool(value);
-        else if (key == "IR") cfg.IR = toBool(value);
         else if (key == "LR") cfg.LR = toBool(value);
         else if (key == "CS") cfg.CS = toBool(value);
         else if (key == "PR") cfg.PR = toBool(value);
